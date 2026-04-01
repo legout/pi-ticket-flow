@@ -20,7 +20,6 @@ It bundles:
 - `/ticket-step` — direct fallback workflow
 - `/ticket-direct` — explicit alias for direct fallback workflow
 - `/ticket-reset` — clear stale orchestrator state
-- compatibility aliases: `/rw-ticket`, `/rw-ticket-chain`, `/rw-step`, `/rw-ticket-direct`, `/rw-reset`
 - `/bridge-smoke` — verify delegated prompt execution works
 
 ### Agents
@@ -28,7 +27,6 @@ It bundles:
 - `ticket-worker` — implementation agent using `kimi-coding/k2p5`
 - `ticket-reviewer` — review agent using `openai-codex/gpt-5.4-mini`
 - `ticket-smoke` — minimal smoke-test agent
-- compatibility aliases: `rw-worker`, `rw-reviewer`, `rw-smoke`
 
 ## Install
 
@@ -63,15 +61,12 @@ This package uses:
 - `pi-prompt-template-model` for prompt templates with `subagent:` frontmatter
 - a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime
 
-The package auto-registers both the canonical `ticket-*` agents and the deprecated `rw-*` aliases into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them.
+The package auto-registers the canonical `ticket-*` agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them.
 
 ## Skills
 
-Canonical workflow skill:
+Workflow skill:
 - `ticket-flow`
-
-Compatibility alias:
-- `ralph-wiggum-ticket`
 
 ## Workflow model
 
@@ -95,5 +90,4 @@ Artifacts used by the workflow:
 
 - `/ticket-flow` is the preferred path.
 - `/ticket-step` remains available as a fallback if the delegated chain flow misbehaves.
-- The old `rw-*` names remain available as deprecated aliases.
 - `/bridge-smoke` is the first thing to run after install.

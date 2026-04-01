@@ -84,7 +84,7 @@ function syncPackageAgents(): void {
   }
 }
 
-export default function registerRwAgents(_pi: ExtensionAPI) {
+export default function registerTicketAgents(_pi: ExtensionAPI) {
   process.env.PI_SUBAGENT_RUNTIME_ROOT ??= runtimeRoot();
   syncPackageAgents();
 }
