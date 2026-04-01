@@ -201,7 +201,7 @@ Findings:
 
 Status:
 - requires human intervention
-- automatic Ralph-Wiggum processing should skip this ticket
+- automatic ticket-flow processing should skip this ticket
 ```
 
 ## Reset behavior

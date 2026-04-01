@@ -6,7 +6,7 @@ skill: ticket-flow
 restore: true
 ---
 
-Reset stale Ralph-Wiggum orchestrator state for the current session.
+Reset stale ticket-flow orchestrator state for the current session.
 
 Rules:
 

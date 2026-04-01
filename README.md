@@ -1,6 +1,6 @@
 # pi-ticket-flow
 
-Standalone pi package for the Ralph-Wiggum **one-ticket** workflow.
+Standalone pi package for a **one-ticket** tk workflow.
 
 It bundles:
 - delegated chain workflow (`/ticket-flow`)

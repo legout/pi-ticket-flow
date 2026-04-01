@@ -5,7 +5,7 @@ thinking: minimal
 skill: ticket-flow
 restore: true
 ---
-Finalize the currently selected Ralph-Wiggum ticket.
+Finalize the currently selected ticket.
 
 Procedure:
 1. Read `ticket-flow/current.md` using `read_artifact`.

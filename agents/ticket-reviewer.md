@@ -1,6 +1,6 @@
 ---
 name: ticket-reviewer
-description: Fresh critical reviewer for one Ralph-Wiggum ticket; audits implementation and writes a structured review artifact.
+description: Fresh critical reviewer for one ticket; audits implementation and writes a structured review artifact.
 model: openai-codex/gpt-5.4-mini
 thinking: high
 spawning: false

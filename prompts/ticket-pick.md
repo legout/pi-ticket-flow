@@ -5,7 +5,7 @@ thinking: minimal
 skill: ticket-flow
 restore: true
 ---
-Pick exactly one eligible ticket for Ralph-Wiggum processing.
+Pick exactly one eligible ticket for ticket-flow processing.
 
 Rules:
 - This step runs in the main session.

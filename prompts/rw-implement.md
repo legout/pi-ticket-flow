@@ -5,7 +5,7 @@ subagent: ticket-worker
 inheritContext: false
 restore: true
 ---
-Implement the currently selected Ralph-Wiggum ticket.
+Implement the currently selected ticket.
 
 Required procedure:
 1. Read `ticket-flow/current.md` using `read_artifact`.

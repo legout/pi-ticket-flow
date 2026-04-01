@@ -4,7 +4,7 @@ chain: ticket-pick -> ticket-implement -> ticket-mark-review -> ticket-review ->
 chainContext: summary
 restore: true
 ---
-This command runs the delegated Ralph-Wiggum one-ticket chain.
+This command runs the delegated ticket-flow one-ticket chain.
 
 Preferred command:
 - `/ticket-flow`

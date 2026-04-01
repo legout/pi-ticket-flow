@@ -5,7 +5,7 @@ thinking: minimal
 skill: ticket-flow
 restore: true
 ---
-Process exactly one ticket using the direct Ralph-Wiggum one-ticket state machine.
+Process exactly one ticket using the direct ticket-flow one-ticket state machine.
 
 This command is intentionally single-ticket and non-parallel.
 This is the **fallback/direct** implementation.

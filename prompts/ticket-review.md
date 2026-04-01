@@ -5,7 +5,7 @@ subagent: ticket-reviewer
 inheritContext: false
 restore: true
 ---
-Critically review the currently selected Ralph-Wiggum ticket.
+Critically review the currently selected ticket.
 
 Required procedure:
 1. Read `ticket-flow/current.md` using `read_artifact`.

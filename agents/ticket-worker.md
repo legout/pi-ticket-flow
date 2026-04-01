@@ -1,6 +1,6 @@
 ---
 name: ticket-worker
-description: Fresh ticket worker for one Ralph-Wiggum ticket; implements, validates, and writes an implementation artifact.
+description: Fresh ticket worker for one ticket; implements, validates, and writes an implementation artifact.
 model: kimi-coding/k2p5
 thinking: medium
 spawning: false
