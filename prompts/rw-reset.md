@@ -1,0 +1,36 @@
+---
+description: Reset stale Ralph-Wiggum orchestrator state for the current session
+model: minimax/MiniMax-M2.7, zai/glm-5-turbo
+thinking: minimal
+skill: ralph-wiggum-ticket
+restore: true
+---
+
+Reset stale Ralph-Wiggum orchestrator state for the current session.
+
+Rules:
+
+- This command only resets orchestrator state.
+- It must **not** close tickets.
+- It must **not** reopen tickets.
+- It must **not** discard code changes.
+- It must **not** delete ticket notes.
+
+Procedure:
+
+1. Try `read_artifact(name: "rw/current.md")`.
+2. If the artifact does not exist, report that there is nothing to reset and stop.
+3. If it exists, briefly summarize the current `ticket` and `stage` from the artifact.
+4. Overwrite `rw/current.md` with this tombstone format:
+
+```md
+ticket: reset
+ticket_path: none
+stage: done
+implementation_artifact: none
+review_artifact: none
+reason: manual reset via /rw-reset
+```
+
+5. Report that orchestrator state was reset successfully.
+6. Stop.

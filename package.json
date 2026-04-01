@@ -1,0 +1,62 @@
+{
+  "name": "pi-ticket-flow",
+  "version": "0.1.0",
+  "description": "Standalone pi package for one-ticket Ralph-Wiggum workflows with delegated chain + direct fallback.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "ralph-wiggum",
+    "subagents",
+    "ticket-workflow"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/legout/pi-ticket-flow.git"
+  },
+  "homepage": "https://github.com/legout/pi-ticket-flow#readme",
+  "bugs": {
+    "url": "https://github.com/legout/pi-ticket-flow/issues"
+  },
+  "type": "module",
+  "files": [
+    "extensions",
+    "prompts",
+    "skills",
+    "agents",
+    "README.md",
+    "package.json"
+  ],
+  "dependencies": {
+    "pi-interactive-subagents": "github:HazAT/pi-interactive-subagents",
+    "pi-prompt-template-model": "^0.6.8"
+  },
+  "bundledDependencies": [
+    "pi-interactive-subagents",
+    "pi-prompt-template-model"
+  ],
+  "bundleDependencies": [
+    "pi-interactive-subagents",
+    "pi-prompt-template-model"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/register-rw-agents.ts",
+      "./node_modules/pi-interactive-subagents/pi-extension/subagents/index.ts",
+      "./node_modules/pi-interactive-subagents/pi-extension/session-artifacts/index.ts",
+      "./extensions/prompt-template-interactive-bridge.ts",
+      "./node_modules/pi-prompt-template-model/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ]
+  }
+}
