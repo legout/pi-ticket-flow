@@ -47,8 +47,8 @@
   "pi": {
     "extensions": [
       "./extensions/register-ticket-agents.ts",
-      "./node_modules/pi-interactive-subagents/pi-extension/subagents/index.ts",
-      "./node_modules/pi-interactive-subagents/pi-extension/session-artifacts/index.ts",
+      "./extensions/interactive-subagents-tools.ts",
+      "./extensions/interactive-session-artifacts.ts",
       "./extensions/prompt-template-interactive-bridge.ts",
       "./node_modules/pi-prompt-template-model/index.ts"
     ],

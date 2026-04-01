@@ -32,6 +32,25 @@ It bundles:
 
 ## Install
 
+### Recommended topology
+
+Use `pi-interactive-subagents` as a **global** pi package, and install `pi-ticket-flow` only in projects that actually use ticket workflows.
+
+Global install once:
+
+```bash
+pi install git:github.com/HazAT/pi-interactive-subagents
+```
+
+Project-local install where needed:
+
+```bash
+cd /path/to/project
+pi install -l git:github.com/legout/pi-ticket-flow
+```
+
+This keeps the canonical subagent/artifact tools available everywhere while limiting `pi-ticket-flow` prompts, skills, and ticket workflow behavior to the relevant repositories.
+
 ### From local path
 
 ```bash
@@ -64,6 +83,42 @@ This package uses:
 - a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime
 
 The package auto-registers the canonical `ticket-*` agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them.
+
+## Tool conflict note
+
+This package already exposes the `pi-interactive-subagents` tools it needs.
+
+Recommended setup:
+- install `pi-interactive-subagents` globally
+- install `pi-ticket-flow` project-locally with `pi install -l ...`
+
+If you also install `git:github.com/HazAT/pi-interactive-subagents` as a separate pi package, pi can report duplicate tool registrations such as `subagent`, `subagents_list`, `set_tab_title`, `subagent_resume`, `write_artifact`, and `read_artifact`.
+
+`pi-ticket-flow` now avoids re-registering those tools when `pi-interactive-subagents` is already configured as its own pi package, so this works even when package load order is unfavorable.
+
+Example settings split:
+
+`~/.pi/agent/settings.json`
+
+```json
+{
+  "packages": [
+    "git:github.com/HazAT/pi-interactive-subagents"
+  ]
+}
+```
+
+`.pi/settings.json`
+
+```json
+{
+  "packages": [
+    "git:github.com/legout/pi-ticket-flow"
+  ]
+}
+```
+
+After changing package scope, run `/reload`.
 
 ## Skills
 

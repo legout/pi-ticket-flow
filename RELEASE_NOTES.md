@@ -8,6 +8,7 @@ First public release of `pi-ticket-flow`.
 - Added delegated single-ticket workflow with fresh worker/reviewer subagents
 - Added `/ticket-queue` for Ralph-style sequential queue processing
 - Switched subagent runtime to `pi-interactive-subagents`
+- Avoid duplicate subagent/artifact tool registration when `pi-interactive-subagents` is already configured separately, even if package load order is unfavorable
 - Added prompt-template compatibility bridge for `subagent:` frontmatter
 - Added durable workflow artifacts for state, progress tracking, and lessons learned
 - Included the Python `tk-ui` board viewer for `tk`-managed `.tickets/`
@@ -26,4 +27,5 @@ First public release of `pi-ticket-flow`.
 
 - Use `/ticket-flow` for exactly one ticket
 - Use `/ticket-queue` for multi-ticket batch processing
+- Recommended install topology: `pi-interactive-subagents` global, `pi-ticket-flow` project-local
 - Old `rw-*` aliases have been removed in favor of canonical `ticket-*` naming
