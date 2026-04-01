@@ -41,7 +41,7 @@ For the assigned ticket:
 You must read:
 
 - `.tickets/<ticket-id>.md`
-- `rw/<ticket-id>/implementation.md`
+- `ticket-flow/<ticket-id>/implementation.md`
 
 You must also inspect the implementation diff and any relevant changed files.
 
@@ -70,7 +70,7 @@ Check all of the following:
 
 Write exactly one artifact at:
 
-`rw/<ticket-id>/review.md`
+`ticket-flow/<ticket-id>/review.md`
 
 Use this format:
 

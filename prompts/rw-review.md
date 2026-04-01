@@ -8,7 +8,7 @@ restore: true
 Critically review the currently selected Ralph-Wiggum ticket.
 
 Required procedure:
-1. Read `rw/current.md` using `read_artifact`.
+1. Read `ticket-flow/current.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
    - `ticket_path:`
@@ -24,7 +24,7 @@ Required procedure:
 5. Read the ticket file.
 6. Read the implementation artifact.
 7. Inspect the current diff and relevant changed files.
-8. Write the review artifact to the exact path from `rw/current.md`.
+8. Write the review artifact to the exact path from `ticket-flow/current.md`.
 9. Do not edit code.
 10. Do not call `tk add-note`.
 11. Do not call `tk close`.

@@ -8,7 +8,7 @@ restore: true
 Implement the currently selected Ralph-Wiggum ticket.
 
 Required procedure:
-1. Read `rw/current.md` using `read_artifact`.
+1. Read `ticket-flow/current.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
    - `ticket_path:`
@@ -28,7 +28,7 @@ Required procedure:
    - `ty check`
    - `mypy src/`
    - `pytest tests/ -x -v`
-10. Write the implementation artifact to the exact path from `rw/current.md`.
+10. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
 11. If blocked, write `status: blocked` clearly in the artifact.
 12. Do not call `tk add-note`.
 13. Do not call `tk close`.

@@ -1,9 +1,9 @@
 ---
-name: ralph-wiggum-ticket
-description: Deprecated alias of ticket-flow. Orchestrate exactly one tk ticket end-to-end with fresh worker and reviewer subagents, using artifacts for durable handoff state.
+name: ticket-flow
+description: Orchestrate exactly one tk ticket end-to-end with fresh worker and reviewer subagents, using artifacts for durable handoff state.
 ---
 
-# Ralph-Wiggum One-Ticket Orchestrator (Deprecated Alias)
+# Ticket Flow One-Ticket Orchestrator
 
 This skill implements **exactly one ticket** per invocation.
 It is designed for use with:
@@ -201,7 +201,7 @@ Findings:
 
 Status:
 - requires human intervention
-- automatic Ralph-Wiggum processing should skip this ticket
+- automatic ticket-flow processing should skip this ticket
 ```
 
 ## Reset behavior

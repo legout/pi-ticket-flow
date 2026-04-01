@@ -69,7 +69,7 @@ If validation fails, keep iterating until it passes or you are genuinely blocked
 
 Write exactly one artifact at:
 
-`rw/<ticket-id>/implementation.md`
+`ticket-flow/<ticket-id>/implementation.md`
 
 Use this format:
 

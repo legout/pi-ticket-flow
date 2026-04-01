@@ -2,13 +2,13 @@
 description: Finalize the selected ticket from implementation and review artifacts
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
-skill: ralph-wiggum-ticket
+skill: ticket-flow
 restore: true
 ---
 Finalize the currently selected Ralph-Wiggum ticket.
 
 Procedure:
-1. Read `rw/current.md` using `read_artifact`.
+1. Read `ticket-flow/current.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
    - `ticket_path:`
@@ -25,7 +25,7 @@ Procedure:
 6. If the implementation artifact indicates `status: blocked`:
    - add a concise structured ESCALATE note via `tk add-note <ticket> ...`
    - explain that implementation blocked before review
-   - overwrite `rw/current.md` with the same values but `stage: done`
+   - overwrite `ticket-flow/current.md` with the same values but `stage: done`
    - stop
 7. Parse `gate: PASS` or `gate: REVISE` from the review artifact.
 8. Run `tk notes <ticket>` and count prior notes containing `Gate: REVISE`.
@@ -40,7 +40,7 @@ Procedure:
    - add a concise structured ESCALATE note via `tk add-note <ticket> ...`
    - include `Gate: ESCALATE`
    - leave the ticket `in_progress`
-12. Overwrite `rw/current.md` with:
+12. Overwrite `ticket-flow/current.md` with:
 
 ```md
 ticket: <ticket>

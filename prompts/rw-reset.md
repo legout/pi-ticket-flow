@@ -2,7 +2,7 @@
 description: Deprecated alias for /ticket-reset
 model: minimax/MiniMax-M2.7, zai/glm-5-turbo
 thinking: minimal
-skill: ralph-wiggum-ticket
+skill: ticket-flow
 restore: true
 ---
 
@@ -18,10 +18,10 @@ Rules:
 
 Procedure:
 
-1. Try `read_artifact(name: "rw/current.md")`.
+1. Try `read_artifact(name: "ticket-flow/current.md")`.
 2. If the artifact does not exist, report that there is nothing to reset and stop.
 3. If it exists, briefly summarize the current `ticket` and `stage` from the artifact.
-4. Overwrite `rw/current.md` with this tombstone format:
+4. Overwrite `ticket-flow/current.md` with this tombstone format:
 
 ```md
 ticket: reset

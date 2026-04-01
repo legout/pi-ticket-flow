@@ -65,6 +65,14 @@ This package uses:
 
 The package auto-registers both the canonical `ticket-*` agents and the deprecated `rw-*` aliases into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them.
 
+## Skills
+
+Canonical workflow skill:
+- `ticket-flow`
+
+Compatibility alias:
+- `ralph-wiggum-ticket`
+
 ## Workflow model
 
 The package processes **exactly one ticket per invocation**.
@@ -79,9 +87,9 @@ High-level flow:
 ## State contract
 
 Artifacts used by the workflow:
-- `rw/current.md`
-- `rw/<ticket-id>/implementation.md`
-- `rw/<ticket-id>/review.md`
+- `ticket-flow/current.md`
+- `ticket-flow/<ticket-id>/implementation.md`
+- `ticket-flow/<ticket-id>/review.md`
 
 ## Notes
 
