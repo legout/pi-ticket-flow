@@ -4,6 +4,7 @@ Standalone pi package for a **one-ticket** tk workflow.
 
 It bundles:
 - delegated chain workflow (`/ticket-flow`)
+- queue workflow (`/ticket-queue`)
 - direct fallback workflow (`/ticket-step`, `/ticket-direct`)
 - reset command (`/ticket-reset`)
 - smoke test (`/bridge-smoke`)
@@ -15,7 +16,8 @@ It bundles:
 
 ### Commands
 
-- `/ticket-flow` — delegated chain workflow (preferred)
+- `/ticket-flow` — delegated chain workflow for exactly one ticket
+- `/ticket-queue` — sequential Ralph-style queue processing until no eligible tickets remain by default
 - `/ticket-flow-chain` — explicit alias for delegated chain workflow
 - `/ticket-step` — direct fallback workflow
 - `/ticket-direct` — explicit alias for direct fallback workflow
@@ -70,7 +72,9 @@ Workflow skill:
 
 ## Workflow model
 
-The package processes **exactly one ticket per invocation**.
+### Single-ticket workflow
+
+`/ticket-flow` processes **exactly one ticket per invocation**.
 
 High-level flow:
 1. pick or resume a ticket
@@ -79,15 +83,29 @@ High-level flow:
 4. delegate review to a fresh reviewer
 5. close on PASS, retry on REVISE up to 3 times, then ESCALATE
 
+### Queue workflow
+
+`/ticket-queue` processes tickets sequentially.
+
+Default behavior:
+- run until `tk ready` has no eligible tickets left
+
+Optional behavior:
+- pass `--loop N` to cap how many tickets are processed in one invocation
+
 ## State contract
 
 Artifacts used by the workflow:
 - `ticket-flow/current.md`
 - `ticket-flow/<ticket-id>/implementation.md`
 - `ticket-flow/<ticket-id>/review.md`
+- `ticket-flow/progress.md`
+- `ticket-flow/lessons-learned.md`
 
 ## Notes
 
-- `/ticket-flow` is the preferred path.
+- `/ticket-flow` is the preferred single-ticket path.
+- `/ticket-queue` is the preferred multi-ticket Ralph-style loop.
+- Use `/ticket-queue` instead of `/ticket-flow --loop ...` for batch processing.
 - `/ticket-step` remains available as a fallback if the delegated chain flow misbehaves.
 - `/bridge-smoke` is the first thing to run after install.

@@ -21,26 +21,27 @@ Procedure:
    - `ticket_path`
    - `implementation_artifact`
    - `review_artifact`
-5. Read both artifacts.
-6. If the implementation artifact indicates `status: blocked`:
+5. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for finalization.
+6. Read both artifacts.
+7. If the implementation artifact indicates `status: blocked`:
    - add a concise structured ESCALATE note via `tk add-note <ticket> ...`
    - explain that implementation blocked before review
    - overwrite `ticket-flow/current.md` with the same values but `stage: done`
    - stop
-7. Parse `gate: PASS` or `gate: REVISE` from the review artifact.
-8. Run `tk notes <ticket>` and count prior notes containing `Gate: REVISE`.
-9. If gate is PASS:
+8. Parse `gate: PASS` or `gate: REVISE` from the review artifact.
+9. Run `tk notes <ticket>` and count prior notes containing `Gate: REVISE`.
+10. If gate is PASS:
    - add a concise structured PASS note via `tk add-note <ticket> ...`
    - close the ticket via `tk close <ticket>`
-10. If gate is REVISE and this is failure 1 or 2:
+11. If gate is REVISE and this is failure 1 or 2:
    - add a concise structured REVISE note via `tk add-note <ticket> ...`
    - include `Review Attempt: <N>/3`
    - leave the ticket `in_progress`
-11. If gate is REVISE and this is failure 3:
+12. If gate is REVISE and this is failure 3:
    - add a concise structured ESCALATE note via `tk add-note <ticket> ...`
    - include `Gate: ESCALATE`
    - leave the ticket `in_progress`
-12. Overwrite `ticket-flow/current.md` with:
+13. Overwrite `ticket-flow/current.md` with:
 
 ```md
 ticket: <ticket>
@@ -50,4 +51,4 @@ implementation_artifact: <implementation_artifact>
 review_artifact: <review_artifact>
 ```
 
-13. End with a short summary including the final gate and ticket id.
+14. End with a short summary including the final gate and ticket id.

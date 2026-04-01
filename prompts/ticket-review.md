@@ -21,11 +21,12 @@ Required procedure:
    - `ticket_path`
    - `implementation_artifact`
    - `review_artifact`
-5. Read the ticket file.
-6. Read the implementation artifact.
-7. Inspect the current diff and relevant changed files.
-8. Write the review artifact to the exact path from `ticket-flow/current.md`.
-9. Do not edit code.
-10. Do not call `tk add-note`.
-11. Do not call `tk close`.
-12. End with a short summary naming the ticket id, gate, and artifact path.
+5. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for review.
+6. Read the ticket file.
+7. Read the implementation artifact.
+8. Inspect the current diff and relevant changed files.
+9. Write the review artifact to the exact path from `ticket-flow/current.md`.
+10. Do not edit code.
+11. Do not call `tk add-note`.
+12. Do not call `tk close`.
+13. End with a short summary naming the ticket id, gate, and artifact path.

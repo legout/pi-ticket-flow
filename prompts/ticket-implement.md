@@ -20,16 +20,17 @@ Required procedure:
    - `ticket`
    - `ticket_path`
    - `implementation_artifact`
-5. Read the ticket file.
-6. Run `tk notes <ticket>`.
-7. Gather all relevant repo context before editing.
-8. Implement exactly this ticket.
-9. Run and fix until green:
+5. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for implementation.
+6. Read the ticket file.
+7. Run `tk notes <ticket>`.
+8. Gather all relevant repo context before editing.
+9. Implement exactly this ticket.
+10. Run and fix until green:
    - `ty check`
    - `mypy src/`
    - `pytest tests/ -x -v`
-10. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
-11. If blocked, write `status: blocked` clearly in the artifact.
-12. Do not call `tk add-note`.
-13. Do not call `tk close`.
-14. End with a short summary naming the ticket id and artifact path.
+11. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
+12. If blocked, write `status: blocked` clearly in the artifact.
+13. Do not call `tk add-note`.
+14. Do not call `tk close`.
+15. End with a short summary naming the ticket id and artifact path.

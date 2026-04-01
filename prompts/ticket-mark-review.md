@@ -16,9 +16,10 @@ Procedure:
    - `review_artifact:`
 3. If parsing fails, stop and tell the user to run `/ticket-reset`.
 4. Extract the current `ticket`, `ticket_path`, `implementation_artifact`, and `review_artifact`.
-5. Read the implementation artifact referenced there.
-6. If the implementation artifact is missing, stop and report that review cannot proceed.
-7. If the implementation artifact indicates `status: blocked`, stop and report that review cannot proceed because implementation is blocked.
-8. Overwrite `ticket-flow/current.md` with the same values, but set:
+5. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for review preparation.
+6. Read the implementation artifact referenced there.
+7. If the implementation artifact is missing, stop and report that review cannot proceed.
+8. If the implementation artifact indicates `status: blocked`, stop and report that review cannot proceed because implementation is blocked.
+9. Overwrite `ticket-flow/current.md` with the same values, but set:
    - `stage: waiting-review`
-9. End with a short summary including the ticket id.
+10. End with a short summary including the ticket id.

@@ -42,6 +42,8 @@ Use these artifact paths:
 - `ticket-flow/current.md` — orchestrator state for the current ticket
 - `ticket-flow/<ticket-id>/implementation.md` — worker output
 - `ticket-flow/<ticket-id>/review.md` — reviewer output
+- `ticket-flow/progress.md` — queue progress and ticket history
+- `ticket-flow/lessons-learned.md` — reusable lessons learned across tickets
 
 ### `ticket-flow/current.md` format
 
@@ -215,3 +217,14 @@ That reset must never close or reopen tickets automatically; it only clears stal
 - If an awaited artifact is missing, **stop immediately** and do not duplicate work.
 - Do not use prompt loops or convergence as the ticket queue manager.
 - The real stop condition is ticket/artifact state, not whether the main session made edits.
+
+
+## Ralph-style Queue Notes
+
+When running a multi-ticket queue, follow these principles:
+
+- one ticket per loop iteration
+- keep queue progress externalized in `ticket-flow/progress.md`
+- capture only durable, reusable learnings in `ticket-flow/lessons-learned.md`
+- stop the queue when there are no eligible tickets left instead of relying on generic convergence
+- prefer fresh loop iterations so each ticket starts from clean context with artifacts as the source of truth
