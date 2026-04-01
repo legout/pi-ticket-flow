@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-step
+description: Explicit alias for the direct fallback ticket workflow
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ralph-wiggum-ticket
@@ -7,8 +7,7 @@ restore: true
 ---
 Process exactly one ticket using the direct Ralph-Wiggum one-ticket state machine.
 
-This command is intentionally single-ticket and non-parallel.
-This is the **fallback/direct** implementation.
+This is the direct fallback implementation.
 Use `/ticket-flow` or `/ticket-flow-chain` for the delegated chain-based implementation.
 
 ## 1) Resume orchestrator state first
@@ -123,30 +122,3 @@ The worker task must instruct it to:
 - not call `tk close`
 
 After spawning the worker, stop immediately.
-
-## 5) Finalization note formatting
-
-For PASS, add a note that includes:
-- `Gate: PASS`
-- brief implementation summary
-- validation summary
-
-For REVISE, add a note that includes:
-- `Gate: REVISE`
-- `Review Attempt: <N>/3`
-- the key findings from the review artifact with severity, file, and remediation
-
-For ESCALATE, add a note that includes:
-- `Gate: ESCALATE`
-- that the maximum automatic retries were reached or that implementation blocked before review
-- the key findings from the relevant artifact with severity, file, and remediation when available
-- that human intervention is required
-
-## Hard constraints
-
-- one ticket per invocation only
-- no parallel ticket handling
-- no prompt loops
-- no reliance on convergence
-- do not implement product code in the main session
-- artifacts are the durable handoff contract

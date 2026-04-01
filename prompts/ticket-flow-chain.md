@@ -1,12 +1,10 @@
 ---
-description: Deprecated alias for /ticket-flow-chain
+description: Explicit alias for the delegated ticket-flow chain
 chain: ticket-pick -> ticket-implement -> ticket-mark-review -> ticket-review -> ticket-finalize
 chainContext: summary
 restore: true
 ---
-Deprecated alias for `/ticket-flow-chain`.
-
-This command runs the delegated ticket-flow one-ticket chain.
+This command runs the delegated Ralph-Wiggum one-ticket chain.
 
 Preferred command:
 - `/ticket-flow`

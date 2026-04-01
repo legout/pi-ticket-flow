@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-implement
+description: Delegate ticket implementation to the fresh ticket-worker subagent
 model: kimi-coding/k2p5
 subagent: ticket-worker
 inheritContext: false

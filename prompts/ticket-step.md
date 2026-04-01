@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-step
+description: Direct fallback implementation — process exactly one tk ticket end-to-end
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ralph-wiggum-ticket

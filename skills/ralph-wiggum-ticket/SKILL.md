@@ -28,7 +28,7 @@ For one ticket only:
 3. **Fresh subagents only.** Worker and reviewer must run with fresh context (`fork: false`).
 4. **Main session is the orchestrator only.** It may read files, call `tk`, spawn subagents, read artifacts, and finalize ticket state. It should not implement product code itself.
 5. **Use artifacts as the source of truth.** Do not rely on memory alone.
-6. **Parse orchestrator state strictly.** `rw/current.md` must contain exactly one line for each required key: `ticket:`, `ticket_path:`, `stage:`, `implementation_artifact:`, `review_artifact:`. If malformed, stop and ask for `/rw-reset`.
+6. **Parse orchestrator state strictly.** `rw/current.md` must contain exactly one line for each required key: `ticket:`, `ticket_path:`, `stage:`, `implementation_artifact:`, `review_artifact:`. If malformed, stop and ask for `/ticket-reset`.
 7. **Do not respawn duplicate subagents.** If a stage is already waiting on a worker/reviewer artifact and the artifact is still missing, stop and wait.
 8. **Only close on PASS.** If review is REVISE, add notes and leave the ticket `in_progress`.
 9. **Max failed reviews per ticket: 3.** On the 3rd failed review, add an escalation note instead of retrying again.
@@ -62,7 +62,7 @@ review_artifact: rw/<ticket-id>/review.md
 At the start of every invocation:
 
 1. Try `read_artifact(name: "rw/current.md")`.
-2. Parse the artifact strictly; if malformed, stop and tell the user to run `/rw-reset`.
+2. Parse the artifact strictly; if malformed, stop and tell the user to run `/ticket-reset`.
 3. If it exists and `stage: waiting-worker`:
    - try to read `implementation_artifact`
    - if the implementation artifact is missing, **do not spawn another worker**; report that the workflow is waiting for the worker and stop
@@ -94,7 +94,7 @@ When there is no unfinished orchestrator state:
 
 ## Worker Spawn
 
-Spawn a subagent using agent `rw-worker`.
+Spawn a subagent using agent `ticket-worker`.
 
 Requirements for the worker task:
 - read `.tickets/<ticket-id>.md`
@@ -118,7 +118,7 @@ The orchestrator must set `fork: false` when spawning the worker.
 When the worker artifact exists and is not blocked:
 
 1. Update `rw/current.md` to `stage: waiting-review`
-2. Spawn a subagent using agent `rw-reviewer`
+2. Spawn a subagent using agent `ticket-reviewer`
 3. Stop
 
 Requirements for the reviewer task:
@@ -206,7 +206,7 @@ Status:
 
 ## Reset behavior
 
-A separate `/rw-reset` prompt may overwrite `rw/current.md` with a tombstone `stage: done` record.
+A separate `/ticket-reset` prompt may overwrite `rw/current.md` with a tombstone `stage: done` record.
 That reset must never close or reopen tickets automatically; it only clears stale orchestrator state.
 
 ## Important Behavior

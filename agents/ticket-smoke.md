@@ -1,13 +1,13 @@
 ---
-name: rw-smoke
-description: Deprecated alias of ticket-smoke for smoke-testing the prompt-template bridge
+name: ticket-smoke
+description: Minimal smoke-test subagent for the prompt-template-model bridge
 model: anthropic/claude-haiku-4-5
 thinking: minimal
 spawning: false
 auto-exit: true
 ---
 
-# RW Smoke (Deprecated Alias)
+# Ticket Smoke
 
 You are a minimal smoke-test subagent.
 

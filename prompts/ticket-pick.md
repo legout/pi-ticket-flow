@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-pick
+description: Pick exactly one eligible tk ticket and initialize rw/current.md
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ralph-wiggum-ticket

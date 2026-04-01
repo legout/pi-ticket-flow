@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-review
+description: Delegate critical ticket review to the fresh ticket-reviewer subagent
 model: openai-codex/gpt-5.4-mini
 subagent: ticket-reviewer
 inheritContext: false

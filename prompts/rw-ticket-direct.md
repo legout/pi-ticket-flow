@@ -1,5 +1,5 @@
 ---
-description: Explicit alias for the direct fallback Ralph-Wiggum workflow
+description: Deprecated alias for /ticket-direct
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ralph-wiggum-ticket
@@ -8,7 +8,7 @@ restore: true
 Process exactly one ticket using the direct Ralph-Wiggum one-ticket state machine.
 
 This is the direct fallback implementation.
-Use `/rw-ticket` or `/rw-ticket-chain` for the delegated chain-based implementation.
+Use `/ticket-flow` or `/ticket-flow-chain` for the delegated chain-based implementation.
 
 ## 1) Resume orchestrator state first
 
@@ -21,7 +21,7 @@ When parsing `rw/current.md`, require exactly one line each with these exact pre
 - `implementation_artifact:`
 - `review_artifact:`
 
-If any required key is missing or duplicated, stop and tell the user to run `/rw-reset`.
+If any required key is missing or duplicated, stop and tell the user to run `/ticket-reset`.
 
 If it exists and contains `stage: waiting-worker`:
 - try to read the implementation artifact referenced there
@@ -33,7 +33,7 @@ If it exists and contains `stage: waiting-worker`:
   - stop immediately
 - if the implementation artifact exists and is not blocked:
   - update `rw/current.md` so `stage: waiting-review`
-  - spawn a fresh `rw-reviewer` subagent for the same ticket
+  - spawn a fresh `ticket-reviewer` subagent for the same ticket
   - stop immediately
 
 If `rw/current.md` exists and contains `stage: waiting-review`:
@@ -104,7 +104,7 @@ review_artifact: rw/<ticket-id>/review.md
 ## 4) Spawn the fresh worker
 
 Spawn a fresh subagent with:
-- `agent: "rw-worker"`
+- `agent: "ticket-worker"`
 - `fork: false`
 - `cwd` set to the project root
 

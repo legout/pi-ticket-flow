@@ -1,12 +1,12 @@
 ---
-description: Deprecated alias for /ticket-reset
+description: Reset stale ticket-flow orchestrator state for the current session
 model: minimax/MiniMax-M2.7, zai/glm-5-turbo
 thinking: minimal
 skill: ralph-wiggum-ticket
 restore: true
 ---
 
-Reset stale Ralph-Wiggum orchestrator state for the current session.
+Reset stale ticket-flow orchestrator state for the current session.
 
 Rules:
 

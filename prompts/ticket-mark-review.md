@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-mark-review
+description: Advance rw/current.md from waiting-worker to waiting-review
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 restore: true

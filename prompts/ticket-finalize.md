@@ -1,5 +1,5 @@
 ---
-description: Deprecated alias for /ticket-finalize
+description: Finalize the selected ticket from implementation and review artifacts
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ralph-wiggum-ticket
