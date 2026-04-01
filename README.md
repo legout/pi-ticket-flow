@@ -1,6 +1,6 @@
 # pi-ticket-flow
 
-Standalone pi package for a **one-ticket** tk workflow.
+Standalone pi package for **tk ticket workflows** with both single-ticket and queue modes.
 
 It bundles:
 - delegated chain workflow (`/ticket-flow`)

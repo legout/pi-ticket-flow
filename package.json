@@ -1,13 +1,13 @@
 {
   "name": "pi-ticket-flow",
   "version": "0.1.0",
-  "description": "Standalone pi package for one-ticket Ralph-Wiggum workflows with delegated chain + direct fallback.",
+  "description": "Standalone pi package for tk ticket workflows with delegated single-ticket and queue modes.",
   "keywords": [
     "pi-package",
     "pi",
-    "ralph-wiggum",
     "subagents",
-    "ticket-workflow"
+    "ticket-workflow",
+    "tk"
   ],
   "license": "MIT",
   "repository": {
