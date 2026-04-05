@@ -1,4 +1,4 @@
-# pi-ticket-flow v0.1.0
+# pi-ticket-flow v0.2.0
 
 First public release of `pi-ticket-flow`.
 
