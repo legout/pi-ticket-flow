@@ -35,15 +35,32 @@ If it exists and contains `stage: waiting-worker`:
 - if the implementation artifact exists and is not blocked:
   - update `ticket-flow/current.md` so `stage: waiting-review`
   - spawn a fresh `ticket-reviewer` subagent for the same ticket
+  - use `fork: false`
+  - set `cwd` to the project root
+  - instruct the reviewer to:
+    - read `.tickets/<ticket-id>.md`
+    - read `ticket-flow/<ticket-id>/implementation.md`
+    - if the ticket contains an ExecPlan Reference section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing
+    - inspect the current diff and relevant changed files
+    - write `ticket-flow/<ticket-id>/review.md`
+    - not edit code
+    - not call `tk add-note`
+    - not call `tk close`
   - stop immediately
 
 If `ticket-flow/current.md` exists and contains `stage: waiting-review`:
+- try to read the implementation artifact referenced in `ticket-flow/current.md`
+- if the implementation artifact is missing, stop and report that review cannot proceed because the implementation artifact is missing
+- if the implementation artifact indicates `status: blocked`:
+  - add a concise escalation note with `Gate: ESCALATE` explaining that implementation blocked before review
+  - update `ticket-flow/current.md` so `stage: done`
+  - stop immediately
 - try to read the review artifact referenced there
 - if the review artifact is missing, do **not** spawn another reviewer
 - report that the workflow is waiting for the reviewer artifact and stop
 - if the review artifact exists:
-  - read both the review artifact and the implementation artifact
   - run `tk notes <ticket-id>` and count prior `Gate: REVISE` notes
+  - if the review artifact does not contain a parseable `gate:` field, stop and report that the review artifact is malformed
   - parse `gate: PASS` or `gate: REVISE`
   - if PASS:
     - add a concise structured ticket note with `tk add-note <ticket-id> ...`
@@ -114,9 +131,7 @@ The worker task must instruct it to:
 - read `tk notes <ticket-id>`
 - gather all relevant code context first
 - implement exactly this ticket
-- run `ty check`
-- run `mypy src/`
-- run `pytest tests/ -x -v`
+- run the repo's relevant validation commands (prefer documented test, typecheck, lint, and build commands; include `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them)
 - fix until all pass or write `status: blocked`
 - write `ticket-flow/<ticket-id>/implementation.md`
 - not call `tk add-note`

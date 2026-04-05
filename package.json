@@ -1,12 +1,15 @@
 {
   "name": "pi-ticket-flow",
   "version": "0.1.0",
-  "description": "Standalone pi package for tk ticket workflows with delegated single-ticket and queue modes.",
+  "description": "Standalone pi package for tk ticket workflows with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.",
   "keywords": [
     "pi-package",
     "pi",
     "subagents",
     "ticket-workflow",
+    "execplan",
+    "brainstorming",
+    "planning",
     "tk"
   ],
   "license": "MIT",

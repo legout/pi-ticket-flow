@@ -13,8 +13,17 @@ First public release of `pi-ticket-flow`.
 - Added durable workflow artifacts for state, progress tracking, and lessons learned
 - Included the Python `tk-ui` board viewer for `tk`-managed `.tickets/`
 
+## Planning
+
+- Added `/ticket-flow-init` — scaffolds `.ticket-flow/AGENTS.md`, `.ticket-flow/PLANS.md`, and inserts a `<!-- ticket-flow -->` marker block in the project root `AGENTS.md`
+- Added planning commands: `/plan`, `/plan-chain`, `/brainstorm`, `/architect`, `/ticketize`
+- Added `execplan-create` and `execplan-improve` skills following the project's `.ticket-flow/PLANS.md` spec
+- ExecPlan spec is no longer embedded in skills — projects must run `/ticket-flow-init` to create `.ticket-flow/PLANS.md`
+- Planning prompts and skills require `.ticket-flow/PLANS.md` and stop with a helpful message if it is missing
+
 ## Commands
 
+- `/ticket-flow-init` — scaffold project guidance files
 - `/ticket-flow` — delegated single-ticket workflow
 - `/ticket-queue` — sequential queue workflow until no eligible tickets remain
 - `/ticket-flow-chain` — alias for delegated flow

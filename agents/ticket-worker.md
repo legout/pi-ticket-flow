@@ -44,6 +44,15 @@ You must read:
 - `.tickets/<ticket-id>.md`
 - `tk notes <ticket-id>`
 
+If the ticket contains an **ExecPlan Reference** section:
+
+- Read the referenced ExecPlan file at the path specified in the reference block
+- Focus on the sections listed in the reference block (typically "Context and Orientation", the relevant Milestone, "Interfaces and Dependencies", and "Decision Log")
+- Use the plan's Context and Orientation for repo understanding
+- Follow the plan's concrete steps for this milestone
+- Respect decisions already recorded in the Decision Log
+- Do not treat the plan as rigid if the code reality differs — use your judgment and record deviations
+
 Also inspect any directly relevant code, tests, helpers, and neighboring implementations before editing.
 
 ### 2) Implement the ticket
@@ -54,13 +63,9 @@ Do not change unrelated code.
 
 ### 3) Validate and fix until green
 
-Run these commands and fix issues until all pass:
-
-```bash
-ty check
-mypy src/
-pytest tests/ -x -v
-```
+Run the repo's relevant validation commands and fix issues until they pass.
+Prefer the project's documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`.
+If the repo clearly uses commands such as `ty check`, `mypy src/`, or `pytest tests/ -x -v`, include them.
 
 If a command is not applicable, record that explicitly in the artifact with evidence.
 If validation fails, keep iterating until it passes or you are genuinely blocked.
@@ -73,7 +78,7 @@ Write exactly one artifact at:
 
 Use this format:
 
-```md
+````md
 # Implementation Result
 
 ticket: <ticket-id>
@@ -95,9 +100,8 @@ status: ready-for-review | blocked
 
 ## Validation
 
-- ty check: PASS | FAIL | N/A
-- mypy src/: PASS | FAIL | N/A
-- pytest tests/ -x -v: PASS | FAIL | N/A
+- <command you ran>: PASS | FAIL | N/A
+- <repeat one bullet per validation command>
 
 ## Validation Evidence
 
@@ -105,13 +109,10 @@ status: ready-for-review | blocked
 <paste concise command outputs or the decisive lines>
 ```
 
-```
-
 ## Remaining Issues
 
 - none
-
-```
+````
 
 If blocked, replace `Remaining Issues` with clear blockers and the exact failing command/output.
 
@@ -122,5 +123,3 @@ Your final assistant message must be short and include:
 - ticket id
 - whether implementation is `ready-for-review` or `blocked`
 - artifact path
-
-```

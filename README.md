@@ -1,8 +1,15 @@
 # pi-ticket-flow
 
-Standalone pi package for **tk ticket workflows** with both single-ticket and queue modes.
+Standalone pi package for **tk ticket workflows** with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.
 
 It bundles:
+- setup/init command (`/ticket-flow-init`)
+- brainstorming skill (`/brainstorm`)
+- architecture documentation (`/architect`)
+- ExecPlan creation and improvement (`/plan-create`, `/plan-improve`)
+- full planning pipeline (`/plan`)
+- non-interactive planning chain (`/plan-chain`)
+- ExecPlan-to-ticket conversion (`/ticketize`)
 - delegated chain workflow (`/ticket-flow`)
 - queue workflow (`/ticket-queue`)
 - direct fallback workflow (`/ticket-step`, `/ticket-direct`)
@@ -14,7 +21,19 @@ It bundles:
 
 ## What it provides
 
-### Commands
+### Planning Commands
+
+- `/ticket-flow-init` — scaffold `.ticket-flow/AGENTS.md`, `.ticket-flow/PLANS.md`, and the root `AGENTS.md` reference
+- `/brainstorm <topic>` — interactive divergent brainstorming session
+- `/architect` — create or update ARCHITECTURE.md
+- `/plan <topic>` — full planning pipeline (brainstorm if needed, architect, create ExecPlan, improve until the plan converges)
+- `/plan-chain <topic>` — non-interactive planning chain once the topic is already clear
+- `/plan-create` — create an ExecPlan from an existing brainstorm
+- `/plan-improve` — deep-audit and improve an existing ExecPlan
+- `/ticketize` — convert ExecPlan milestones into tk tickets with dependencies and ExecPlan references
+- `/plan-and-build <topic>` — helps launch planning and ticket execution; it can queue the next safe step when `run-prompt` is available
+
+### Execution Commands
 
 - `/ticket-flow` — delegated chain workflow for exactly one ticket
 - `/ticket-queue` — sequential Ralph-style queue processing until no eligible tickets remain by default
@@ -23,6 +42,10 @@ It bundles:
 - `/ticket-direct` — explicit alias for direct fallback workflow
 - `/ticket-reset` — clear stale orchestrator state
 - `/bridge-smoke` — verify delegated prompt execution works
+
+### Maintenance Commands
+
+- `/update-architecture` — sync ARCHITECTURE.md after ExecPlan implementation
 
 ### Agents
 
@@ -48,6 +71,8 @@ Project-local install where needed:
 cd /path/to/project
 pi install -l git:github.com/legout/pi-ticket-flow
 ```
+
+Then run `/ticket-flow-init` inside the target project to scaffold the recommended `.ticket-flow/` guidance files.
 
 This keeps the canonical subagent/artifact tools available everywhere while limiting `pi-ticket-flow` prompts, skills, and ticket workflow behavior to the relevant repositories.
 
@@ -122,6 +147,14 @@ After changing package scope, run `/reload`.
 
 ## Skills
 
+Planning skills:
+- `brainstorm` — interactive divergent brainstorming
+- `architect` — create/update ARCHITECTURE.md
+- `execplan-create` — self-contained ExecPlan creation following PLANS.md spec
+- `execplan-improve` — 7-criteria audit with Ousterhout lens and usefulness scoring
+- `ticketize` — ExecPlan milestones to tk tickets with ExecPlan references
+- `update-architecture` — post-implementation architecture sync
+
 Workflow skill:
 - `ticket-flow`
 
@@ -150,6 +183,22 @@ Optional behavior:
 
 ## State contract
 
+### Planning docs (repo files, git-tracked)
+
+- `.ticket-flow/plans/<topic-slug>/brainstorm.md` — brainstorming output
+- `.ticket-flow/plans/<topic-slug>/execplan.md` — ExecPlan (living document)
+- `ARCHITECTURE.md` — project architecture doc
+
+Planning docs are repo files so they sync across machines. Commit them to git.
+
+Recommended workflow guidance files:
+
+- `.ticket-flow/AGENTS.md` — pi-ticket-flow, tk, and ExecPlan instructions for the project
+- `.ticket-flow/PLANS.md` — the ExecPlan authoring spec used by planning prompts and skills
+- `AGENTS.md` — should reference `.ticket-flow/AGENTS.md`
+
+### Session artifacts (ephemeral)
+
 Artifacts used by the workflow:
 - `ticket-flow/current.md`
 - `ticket-flow/<ticket-id>/implementation.md`
@@ -159,6 +208,8 @@ Artifacts used by the workflow:
 
 ## Notes
 
+- `/plan` is the preferred entry point for new features — it handles brainstorming through plan creation.
+- `/plan-and-build` is the power-user shortcut once brainstorming is already complete; with `run-prompt` enabled it can queue the next safe step and tell you the remaining commands.
 - `/ticket-flow` is the preferred single-ticket path.
 - `/ticket-queue` is the preferred multi-ticket Ralph-style loop.
 - Use `/ticket-queue` instead of `/ticket-flow --loop ...` for batch processing.

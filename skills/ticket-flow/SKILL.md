@@ -16,8 +16,8 @@ For one ticket only:
 1. pick or resume a ticket
 2. gather context
 3. implement
-4. run `ty check` and `mypy` and fix all issues
-5. run tests and fix issues until green
+4. run the repo's relevant validation commands and fix all issues
+5. keep validation green before review
 6. perform a critical audit review
 7. close on PASS, retry on REVISE up to a limit, then escalate
 
@@ -103,15 +103,15 @@ Requirements for the worker task:
 - read `tk notes <ticket-id>`
 - gather all relevant code context before editing
 - implement only this ticket
-- run:
-  - `ty check`
-  - `mypy src/`
-  - `pytest tests/ -x -v`
+- run the repo's relevant validation commands
+- prefer documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`
+- include commands such as `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them
 - fix issues until all pass
 - if blocked, write `status: blocked` clearly in the implementation artifact
 - write `ticket-flow/<ticket-id>/implementation.md`
 - do not close the ticket
 - do not add ticket notes
+- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
 
 The orchestrator must set `fork: false` when spawning the worker.
 
@@ -132,6 +132,7 @@ Requirements for the reviewer task:
 - do not edit code
 - do not close the ticket
 - do not add ticket notes
+- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
 
 The orchestrator must set `fork: false` when spawning the reviewer.
 
@@ -163,9 +164,8 @@ Summary:
 - <implementation summary>
 
 Validation:
-- ty check: PASS
-- mypy src/: PASS
-- pytest tests/ -x -v: PASS
+- <command you ran>: PASS
+- <repeat one bullet per validation command>
 
 Review:
 - acceptance criteria satisfied

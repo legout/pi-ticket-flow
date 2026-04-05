@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   closeSurface,
   createSurface,
@@ -156,7 +157,7 @@ const runningRequests = new Map<string, { controllers: AbortController[] }>();
 let latestCtx: ExtensionContext | null = null;
 
 function packageRoot(): string {
-  return resolve(dirname(new URL(import.meta.url).pathname), "..");
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..");
 }
 
 function getAgentConfigDir(): string {
@@ -444,10 +445,12 @@ async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSuba
     parts.push("--fork", shellEscape(forkCleanupFile));
   }
 
-  const subagentDonePath = new URL(
-    "../node_modules/pi-interactive-subagents/pi-extension/subagents/subagent-done.ts",
-    import.meta.url,
-  ).pathname;
+  const subagentDonePath = fileURLToPath(
+    new URL(
+      "../node_modules/pi-interactive-subagents/pi-extension/subagents/subagent-done.ts",
+      import.meta.url,
+    ),
+  );
   parts.push("-e", shellEscape(subagentDonePath));
 
   if (effectiveModel) {

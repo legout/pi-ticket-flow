@@ -43,6 +43,8 @@ You must read:
 - `.tickets/<ticket-id>.md`
 - `ticket-flow/<ticket-id>/implementation.md`
 
+If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
+
 You must also inspect the implementation diff and any relevant changed files.
 
 Useful commands include:
