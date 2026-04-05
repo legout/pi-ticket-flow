@@ -1,40 +1,47 @@
-# pi-ticket-flow v0.2.0
+# pi-ticket-flow v0.3.0
 
-First public release of `pi-ticket-flow`.
+Prompt consolidation — fewer files, same functionality, better use of pi chain/loop features.
 
 ## Highlights
 
-- Added canonical `ticket-*` workflow API
-- Added delegated single-ticket workflow with fresh worker/reviewer subagents
-- Added `/ticket-queue` for Ralph-style sequential queue processing
-- Switched subagent runtime to `pi-interactive-subagents`
-- Avoid duplicate subagent/artifact tool registration when `pi-interactive-subagents` is already configured separately, even if package load order is unfavorable
-- Added prompt-template compatibility bridge for `subagent:` frontmatter
-- Added durable workflow artifacts for state, progress tracking, and lessons learned
-- Included the Python `tk-ui` board viewer for `tk`-managed `.tickets/`
+- Consolidated 24 prompts down to 19 by removing duplicates and merging queue-specific variants
+- Simplified orchestrator prompts (`/plan`, `/plan-and-build`) to use `chain:` frontmatter instead of inlined multi-step instructions
+- Merged `ticket-pick`/`ticket-queue-pick` and `ticket-finalize`/`ticket-queue-finalize` — the merged versions auto-detect queue context via `progress.md` existence
+- Both `/ticket-flow` and `/ticket-queue` now share the exact same chain: `ticket-pick → ticket-implement → ticket-mark-review → ticket-review → ticket-finalize`
 
-## Planning
+## Removed commands
 
-- Added `/ticket-flow-init` — scaffolds `.ticket-flow/AGENTS.md`, `.ticket-flow/PLANS.md`, and inserts a `<!-- ticket-flow -->` marker block in the project root `AGENTS.md`
-- Added planning commands: `/plan`, `/plan-chain`, `/brainstorm`, `/architect`, `/ticketize`
-- Added `execplan-create` and `execplan-improve` skills following the project's `.ticket-flow/PLANS.md` spec
-- ExecPlan spec is no longer embedded in skills — projects must run `/ticket-flow-init` to create `.ticket-flow/PLANS.md`
-- Planning prompts and skills require `.ticket-flow/PLANS.md` and stop with a helpful message if it is missing
+These were duplicates or inlined copies of existing chains:
 
-## Commands
+- `/ticket-flow-chain` — identical to `/ticket-flow`
+- `/ticket-step` — identical to `/ticket-direct`
+- `/ticket-direct` — inlined copy of the `/ticket-flow` chain
+- `/ticket-queue-pick` — merged into `/ticket-pick`
+- `/ticket-queue-finalize` — merged into `/ticket-finalize`
 
+## Simplified commands
+
+- `/plan` — now delegates to `/plan-chain` instead of inlining the architect/create/improve steps
+- `/plan-and-build` — now a pure chain: `plan → ticketize → ticket-queue` (was 30 lines of procedural orchestration, now 7 lines)
+
+## Commands (complete list)
+
+### Planning
 - `/ticket-flow-init` — scaffold project guidance files
-- `/ticket-flow` — delegated single-ticket workflow
-- `/ticket-queue` — sequential queue workflow until no eligible tickets remain
-- `/ticket-flow-chain` — alias for delegated flow
-- `/ticket-step` — direct fallback workflow
-- `/ticket-direct` — alias for direct fallback
+- `/brainstorm <topic>` — interactive brainstorming
+- `/architect <topic>` — create/update ARCHITECTURE.md
+- `/plan <topic>` — full pipeline: brainstorm → plan-chain
+- `/plan-chain <topic>` — chain: architect → plan-create → plan-improve
+- `/plan-create <topic>` — create ExecPlan
+- `/plan-improve <topic>` — deep-audit ExecPlan (loops up to 3×)
+- `/ticketize <topic>` — ExecPlan → tk tickets
+- `/plan-and-build <topic>` — chain: plan → ticketize → ticket-queue
+
+### Execution
+- `/ticket-flow` — chain: pick → implement → review → finalize (one ticket)
+- `/ticket-queue` — chain with loop: pick → implement → review → finalize (until queue empty)
 - `/ticket-reset` — clear stale orchestrator state
-- `/bridge-smoke` — verify delegated prompt execution
+- `/bridge-smoke` — verify delegated execution works
 
-## Notes
-
-- Use `/ticket-flow` for exactly one ticket
-- Use `/ticket-queue` for multi-ticket batch processing
-- Recommended install topology: `pi-interactive-subagents` global, `pi-ticket-flow` project-local
-- Old `rw-*` aliases have been removed in favor of canonical `ticket-*` naming
+### Maintenance
+- `/update-architecture <topic>` — sync ARCHITECTURE.md post-implementation

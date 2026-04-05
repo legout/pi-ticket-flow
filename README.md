@@ -7,12 +7,11 @@ It bundles:
 - brainstorming skill (`/brainstorm`)
 - architecture documentation (`/architect`)
 - ExecPlan creation and improvement (`/plan-create`, `/plan-improve`)
-- full planning pipeline (`/plan`)
-- non-interactive planning chain (`/plan-chain`)
+- full planning pipeline (`/plan`, `/plan-chain`)
 - ExecPlan-to-ticket conversion (`/ticketize`)
+- full plan-and-build pipeline (`/plan-and-build`)
 - delegated chain workflow (`/ticket-flow`)
 - queue workflow (`/ticket-queue`)
-- direct fallback workflow (`/ticket-step`, `/ticket-direct`)
 - reset command (`/ticket-reset`)
 - smoke test (`/bridge-smoke`)
 - fresh worker/reviewer subagents
@@ -26,20 +25,17 @@ It bundles:
 - `/ticket-flow-init` — scaffold `.ticket-flow/AGENTS.md`, `.ticket-flow/PLANS.md`, and the root `AGENTS.md` reference
 - `/brainstorm <topic>` — interactive divergent brainstorming session
 - `/architect` — create or update ARCHITECTURE.md
-- `/plan <topic>` — full planning pipeline (brainstorm if needed, architect, create ExecPlan, improve until the plan converges)
-- `/plan-chain <topic>` — non-interactive planning chain once the topic is already clear
+- `/plan <topic>` — full planning pipeline (brainstorm if needed, then delegates to `/plan-chain`)
+- `/plan-chain <topic>` — non-interactive planning chain: architect → plan-create → plan-improve
 - `/plan-create` — create an ExecPlan from an existing brainstorm
-- `/plan-improve` — deep-audit and improve an existing ExecPlan
+- `/plan-improve` — deep-audit and improve an existing ExecPlan (loops up to 3×)
 - `/ticketize` — convert ExecPlan milestones into tk tickets with dependencies and ExecPlan references
-- `/plan-and-build <topic>` — helps launch planning and ticket execution; it can queue the next safe step when `run-prompt` is available
+- `/plan-and-build <topic>` — full pipeline: plan → ticketize → ticket-queue
 
 ### Execution Commands
 
-- `/ticket-flow` — delegated chain workflow for exactly one ticket
-- `/ticket-queue` — sequential Ralph-style queue processing until no eligible tickets remain by default
-- `/ticket-flow-chain` — explicit alias for delegated chain workflow
-- `/ticket-step` — direct fallback workflow
-- `/ticket-direct` — explicit alias for direct fallback workflow
+- `/ticket-flow` — delegated chain workflow for exactly one ticket (pick → implement → review → finalize)
+- `/ticket-queue` — sequential queue processing until no eligible tickets remain (loops, tracks progress/lessons)
 - `/ticket-reset` — clear stale orchestrator state
 - `/bridge-smoke` — verify delegated prompt execution works
 
@@ -208,10 +204,8 @@ Artifacts used by the workflow:
 
 ## Notes
 
-- `/plan` is the preferred entry point for new features — it handles brainstorming through plan creation.
-- `/plan-and-build` is the power-user shortcut once brainstorming is already complete; with `run-prompt` enabled it can queue the next safe step and tell you the remaining commands.
+- `/plan` is the preferred entry point for new features — it handles brainstorming then delegates to `/plan-chain`.
+- `/plan-and-build` is the power-user shortcut: plan → ticketize → queue, all in one command.
 - `/ticket-flow` is the preferred single-ticket path.
-- `/ticket-queue` is the preferred multi-ticket Ralph-style loop.
-- Use `/ticket-queue` instead of `/ticket-flow --loop ...` for batch processing.
-- `/ticket-step` remains available as a fallback if the delegated chain flow misbehaves.
+- `/ticket-queue` is the preferred multi-ticket loop.
 - `/bridge-smoke` is the first thing to run after install.
