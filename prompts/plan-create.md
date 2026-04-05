@@ -1,6 +1,6 @@
 ---
 description: Create an ExecPlan from a brainstorm or user brief
-model: kimi-coding/k2p5, openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.4, zai/glm-5.1
 thinking: high
 skill: execplan-create
 restore: true

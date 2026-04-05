@@ -1,6 +1,6 @@
 ---
 description: Create or update ARCHITECTURE.md for the project
-model: kimi-coding/k2p5, anthropic/claude-sonnet-4-20250514
+model: zai/glm-5.1, kimi-coding/k2p5
 thinking: high
 skill: architect
 restore: true

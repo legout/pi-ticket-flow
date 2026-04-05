@@ -46,7 +46,7 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 - Use `/ticketize <topic>` to convert an ExecPlan into tk tickets.
 - Use `/ticket-flow` for one-ticket delegated execution.
 - Use `/ticket-queue` for sequential batch execution.
-- Use `/ticket-step` or `/ticket-direct` only as fallback direct workflows.
+- Use `/ticket-reset` to clear stale orchestrator state.
 
 ## Artifact locations
 

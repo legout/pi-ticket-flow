@@ -1,6 +1,6 @@
 ---
 description: Interactive brainstorming session for a topic or feature idea
-model: kimi-coding/k2p5, anthropic/claude-sonnet-4-20250514
+model: openai-codex/gpt-5.4
 thinking: high
 skill: brainstorm
 restore: true

@@ -1,7 +1,7 @@
 ---
 description: Deep-audit and improve an existing ExecPlan with code-grounded improvements
-model: openai-codex/gpt-5.4-mini, anthropic/claude-sonnet-4-20250514, kimi-coding/k2p5
-thinking: high, high, medium
+model: openai-codex/gpt-5.4-mini, zai/glm-5.1, kimi-coding/k2p5
+thinking: high, high, high
 skill: execplan-improve
 loop: 3
 rotate: true
