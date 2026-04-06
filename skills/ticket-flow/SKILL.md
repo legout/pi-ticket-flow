@@ -52,7 +52,7 @@ Use this format exactly:
 ```md
 ticket: <ticket-id>
 ticket_path: .tickets/<ticket-id>.md
-stage: waiting-worker | waiting-review | done
+stage: waiting-worker | waiting-validation | waiting-review | done
 implementation_artifact: ticket-flow/<ticket-id>/implementation.md
 review_artifact: ticket-flow/<ticket-id>/review.md
 ```
@@ -67,15 +67,21 @@ At the start of every invocation:
 2. Parse the artifact strictly; if malformed, stop and tell the user to run `/ticket-reset`.
 3. If it exists and `stage: waiting-worker`:
    - try to read `implementation_artifact`
-   - if the implementation artifact is missing, **do not spawn another worker**; report that the workflow is waiting for the worker and stop
+   - if the implementation artifact is missing, **do not spawn another worker**; report that the workflow is waiting for implementation work and stop
    - if the implementation artifact contains `status: blocked`, escalate immediately, mark `ticket-flow/current.md` as `done`, and stop
-   - if the implementation artifact exists and is not blocked, advance to review stage
-4. If it exists and `stage: waiting-review`:
+   - if the implementation artifact contains `status: ready-for-validation`, update `ticket-flow/current.md` to `stage: waiting-validation`, then spawn the validation step and stop
+4. If it exists and `stage: waiting-validation`:
+   - try to read `implementation_artifact`
+   - if the implementation artifact is missing, **do not spawn another validation worker**; report that the workflow is waiting for validation and stop
+   - if the implementation artifact contains `status: blocked`, escalate immediately, mark `ticket-flow/current.md` as `done`, and stop
+   - if the implementation artifact contains `status: ready-for-validation`, report that validation is in progress and stop
+   - if the implementation artifact contains `status: ready-for-review`, continue to the review-prep step (the `ticket-mark-review` prompt will advance the stage)
+6. If it exists and `stage: waiting-review`:
    - try to read `review_artifact`
    - if the review artifact is missing, **do not spawn another reviewer**; report that the workflow is waiting for the reviewer and stop
    - if the review artifact exists, finalize the ticket
-5. If it exists and `stage: done`, ignore it and continue to ticket selection
-6. If it does not exist, continue to ticket selection
+7. If it exists and `stage: done`, ignore it and continue to ticket selection
+8. If it does not exist, continue to ticket selection
 
 ## Ticket Selection
 
@@ -92,35 +98,52 @@ When there is no unfinished orchestrator state:
 7. If the chosen ticket is not already `in_progress`, run:
    - `tk start <ticket-id>`
 8. Write `ticket-flow/current.md` with `stage: waiting-worker`
-9. Spawn the worker and stop
+9. Spawn the implementation worker and stop
 
 ## Worker Spawn
 
-Spawn a subagent using agent `ticket-worker`.
+Spawn a fresh subagent using the base `worker` agent with the `ticket-implement` workflow contract.
 
 Requirements for the worker task:
 - read `.tickets/<ticket-id>.md`
 - read `tk notes <ticket-id>`
 - gather all relevant code context before editing
 - implement only this ticket
-- run the repo's relevant validation commands
-- prefer documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`
-- include commands such as `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them
-- fix issues until all pass
-- if blocked, write `status: blocked` clearly in the implementation artifact
-- write `ticket-flow/<ticket-id>/implementation.md`
+- write `ticket-flow/<ticket-id>/implementation.md` with `status: ready-for-validation` or `blocked`
 - do not close the ticket
 - do not add ticket notes
 - if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
 
 The orchestrator must set `fork: false` when spawning the worker.
 
+## Validation Spawn
+
+When the implementation artifact exists and is `ready-for-validation`:
+
+1. Update `ticket-flow/current.md` to `stage: waiting-validation`
+2. Spawn a fresh subagent using the base `worker` agent with the `ticket-test-fix` workflow contract
+3. Stop
+
+Requirements for the validation task:
+- read `.tickets/<ticket-id>.md`
+- read `ticket-flow/<ticket-id>/implementation.md`
+- run the repo's relevant validation commands
+- prefer documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`
+- include commands such as `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them
+- fix issues until all pass or are genuinely blocked
+- update `ticket-flow/<ticket-id>/implementation.md` to `ready-for-review` or `blocked`
+- do not close the ticket
+- do not add ticket notes
+- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
+
+The orchestrator must set `fork: false` when spawning the validation worker.
+
 ## Review Spawn
 
-When the worker artifact exists and is not blocked:
+When the implementation artifact exists and is `ready-for-review`:
 
 1. Update `ticket-flow/current.md` to `stage: waiting-review`
-2. Spawn a subagent using agent `ticket-reviewer`
+2. Spawn a fresh subagent using the base `reviewer` agent with the `ticket-review` workflow contract
 3. Stop
 
 Requirements for the reviewer task:

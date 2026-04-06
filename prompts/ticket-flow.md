@@ -1,6 +1,6 @@
 ---
 description: Process exactly one tk ticket via delegated ticket-flow chain
-chain: ticket-pick -> ticket-implement -> ticket-mark-review -> ticket-review -> ticket-finalize
+chain: ticket-pick -> ticket-implement -> ticket-test-fix -> ticket-mark-review -> ticket-review -> ticket-finalize
 chainContext: summary
 restore: true
 ---

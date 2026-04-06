@@ -1,6 +1,6 @@
 ---
 description: Process ready tickets sequentially until the queue is empty (default) or a loop cap is reached
-chain: ticket-pick -> ticket-implement -> ticket-mark-review -> ticket-review -> ticket-finalize
+chain: ticket-pick -> ticket-implement -> ticket-test-fix -> ticket-mark-review -> ticket-review -> ticket-finalize
 chainContext: summary
 restore: true
 loop: unlimited

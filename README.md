@@ -5,6 +5,7 @@ Standalone pi package for **tk ticket workflows** with brainstorming, planning, 
 It bundles:
 - setup/init command (`/ticket-flow-init`)
 - brainstorming skill (`/brainstorm`)
+- bundled `researcher` subagent for optional external research during planning
 - architecture documentation (`/architect`)
 - ExecPlan creation and improvement (`/plan-create`, `/plan-improve`)
 - full planning pipeline (`/plan`, `/plan-chain`)
@@ -29,13 +30,19 @@ It bundles:
 - `/plan-chain <topic>` — non-interactive planning chain: architect → plan-create → plan-improve
 - `/plan-create` — create an ExecPlan from an existing brainstorm
 - `/plan-improve` — deep-audit and improve an existing ExecPlan (loops up to 3×)
+- `/review` — simple code review
+- `/review-deep` — deep parallel multi-lens code review with final consolidation
+- `/refactor-deep` — deeper refactoring analysis with optional research
+- `/simplify-deep` — deeper simplification analysis with optional research
 - `/ticketize` — convert ExecPlan milestones into tk tickets with dependencies and ExecPlan references
 - `/plan-and-build <topic>` — full pipeline: plan → ticketize → ticket-queue
 
 ### Execution Commands
 
-- `/ticket-flow` — delegated chain workflow for exactly one ticket (pick → implement → review → finalize)
+- `/ticket-flow` — delegated chain workflow for exactly one ticket (pick → implement → validate/fix → review → finalize)
 - `/ticket-queue` — sequential queue processing until no eligible tickets remain (loops, tracks progress/lessons)
+- `/ticket-test-fix` — validate and fix the currently selected ticket until it is ready for review
+- `/ticket-review-deep` — deep ticket review with parallel review passes and final consolidation
 - `/ticket-reset` — clear stale orchestrator state
 - `/bridge-smoke` — verify delegated prompt execution works
 
@@ -45,9 +52,11 @@ It bundles:
 
 ### Agents
 
-- `ticket-worker` — implementation agent using `kimi-coding/k2p5`
-- `ticket-reviewer` — review agent using `openai-codex/gpt-5.4-mini`
 - `ticket-smoke` — minimal smoke-test agent
+- `researcher` — focused research agent for docs, APIs, best practices, and technology choices
+- `change-planner` — shared planner for refactor/simplify analysis and todo creation
+
+Ticket implementation, validation/fix-to-green, and review use the base `worker` and `reviewer` agents provided by `pi-interactive-subagents`, specialized through the `ticket-implement`, `ticket-test-fix`, and `ticket-review` skills/prompts.
 
 ## Install
 
@@ -103,7 +112,7 @@ This package uses:
 - `pi-prompt-template-model` for prompt templates with `subagent:` frontmatter
 - a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime
 
-The package auto-registers the canonical `ticket-*` agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them.
+The package auto-registers its bundled agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them. This includes the bundled helper agents such as `ticket-smoke`, `researcher`, and `change-planner`. Ticket implementation and review now use the base `worker` and `reviewer` agents from `pi-interactive-subagents` via specialized prompts/skills.
 
 ## Tool conflict note
 
@@ -151,8 +160,11 @@ Planning skills:
 - `ticketize` — ExecPlan milestones to tk tickets with ExecPlan references
 - `update-architecture` — post-implementation architecture sync
 
-Workflow skill:
+Workflow skills:
 - `ticket-flow`
+- `ticket-implement` — implement the currently selected ticket using the base worker agent
+- `ticket-test-fix` — validate and fix the currently selected ticket using the base worker agent
+- `ticket-review` — review the currently selected ticket using the base reviewer agent
 
 ## Workflow model
 
@@ -163,7 +175,7 @@ Workflow skill:
 High-level flow:
 1. pick or resume a ticket
 2. delegate implementation to a fresh worker
-3. run validation until green (inside worker)
+3. delegate validation/fix-to-green to a fresh worker
 4. delegate review to a fresh reviewer
 5. close on PASS, retry on REVISE up to 3 times, then ESCALATE
 
@@ -208,4 +220,6 @@ Artifacts used by the workflow:
 - `/plan-and-build` is the power-user shortcut: plan → ticketize → queue, all in one command.
 - `/ticket-flow` is the preferred single-ticket path.
 - `/ticket-queue` is the preferred multi-ticket loop.
+- `/review-deep` is the higher-confidence path for non-ticket code review when you want multiple independent review lenses plus final consolidation.
+- `/ticket-review-deep` is the optional manual high-confidence ticket review path using parallel review passes plus final consolidation.
 - `/bridge-smoke` is the first thing to run after install.

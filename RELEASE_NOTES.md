@@ -1,3 +1,12 @@
+# Unreleased
+
+## Review prompt redesign
+
+- Replaced `/review` with a simple single-review prompt using the base `reviewer` agent
+- Replaced `/review-deep` Best-of-N review with parallel review passes plus a final consolidation step
+- Replaced `/ticket-review-deep` Best-of-N review with parallel ticket-review passes plus a final consolidation step that writes the canonical ticket review artifact
+- Removed the obsolete internal `/review-single` alias and updated `/review-fix-chain` to use `/review` directly
+
 # pi-ticket-flow v0.3.0
 
 Prompt consolidation — fewer files, same functionality, better use of pi chain/loop features.
