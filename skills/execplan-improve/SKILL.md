@@ -92,10 +92,10 @@ Evaluate against seven criteria:
 | **Accuracy** | Do paths exist? Do signatures match? Are behaviors described correctly? |
 | **Completeness** | Every file, test, import, and dependency covered? Any missing milestones? |
 | **Self-containment** | Could a novice implement end-to-end with only this file? Terms defined? Commands complete? |
-| **Feasibility** | Steps achievable in order? Hidden dependencies between milestones? |
+| **Feasibility** | Steps achievable in order? Hidden dependencies between milestones? Are prerequisites, related non-blocking milestones, parallel-safe slices, and serialization points explicit? |
 | **Testability** | Concrete verification per milestone? Test paths, names, assertions specified? |
 | **Safety** | Idempotent? Retriable? Destructive ops have rollback? |
-| **Design Quality** | Does the plan actually reduce complexity, deepen a boundary, hide sequencing/policy, and explain the complexity dividend? |
+| **Design Quality** | Does the plan actually reduce complexity, deepen a boundary, hide sequencing/policy, explain the complexity dividend, and prefer independently verifiable slices over needless horizontal phases? |
 
 ### Step 5: Rewrite the Plan
 
@@ -106,6 +106,7 @@ Apply only code-grounded improvements:
 - Fix inaccuracies (wrong paths, signatures, line numbers)
 - Add missing files, functions, dependencies, and milestones
 - Split milestones that are too large
+- Replace layer-by-layer milestone chains with smaller independently verifiable slices when that improves executability without changing intent
 - Fill in vague commands with working directories and expected output
 - Make acceptance criteria observable and verifiable
 - Define undefined jargon
@@ -117,6 +118,7 @@ Apply only code-grounded improvements:
 - Call out when a proposed abstraction is shallow and either justify it or replace it with a simpler plan shape
 - Remove plan language that adds concepts or layers without reducing interface burden
 - Name the complexity dividend: what future readers or callers no longer need to know after the change
+- Make milestone prerequisites, related non-blocking links, safe parallelism, and serialization/conflict points explicit when the codebase evidence supports them
 
 Do not change the plan's intent. Do not add milestones that do not serve the original purpose. Make the same plan more accurate, complete, and executable.
 

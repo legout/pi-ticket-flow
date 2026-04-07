@@ -134,6 +134,8 @@ Milestones are narrative, not bureaucracy. If you break the work into milestones
 
 Each milestone must be independently verifiable and incrementally implement the overall goal of the execution plan.
 
+Prefer milestones that deliver an observable, end-to-end slice of behavior rather than only moving one horizontal layer. When a purely enabling, migration, cleanup, or prototyping milestone is necessary, label it plainly and explain why it must happen before or after later slices. Make dependency relationships explicit in the milestone prose: name true prerequisites, identify related-but-non-blocking milestones, identify milestones that can proceed in parallel, and call out any shared boundary or serialization/conflict point (for example schema migrations, shared public interfaces, central registries, package manifests, or global configuration) that should not be changed concurrently.
+
 ## Living plans and design decisions
 
 * ExecPlans are living documents. As you make key design decisions, update the plan to record both the decision and the thinking behind it. Record all decisions in the `Decision Log` section.
@@ -147,6 +149,8 @@ Each milestone must be independently verifiable and incrementally implement the 
 It is acceptable—and often encouraged—to include explicit prototyping milestones when they de-risk a larger change. Examples: adding a low-level operator to a dependency to validate feasibility, or exploring two composition orders while measuring optimizer effects. Keep prototypes additive and testable. Clearly label the scope as “prototyping”; describe how to run and observe results; and state the criteria for promoting or discarding the prototype.
 
 Prefer additive code changes followed by subtractions that keep tests passing. Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk or enable tests to continue passing during a large migration. Describe how to validate both paths and how to retire one safely with tests. When working with multiple new libraries or feature areas, consider creating spikes that evaluate the feasibility of these features _independently_ of one another, proving that the external library performs as expected and implements the features we need in isolation.
+
+When a plan will later be broken into tickets, prefer milestones that can become independently reviewable tickets. In practice, this usually means user-visible or contract-visible vertical slices plus a small number of clearly labeled enabler or cleanup milestones. Also make it clear which milestones are merely related, which are true prerequisites, and which should not be implemented concurrently because they collide on shared boundaries. Keep the prose narrative; do not replace milestone explanations with a rigid task schema.
 
 ## Skeleton of a Good ExecPlan
 

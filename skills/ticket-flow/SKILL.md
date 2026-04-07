@@ -16,7 +16,7 @@ For one ticket only:
 1. pick or resume a ticket
 2. gather context
 3. implement
-4. run the repo's relevant validation commands and fix all issues
+4. hand off to a separate validation/fix step
 5. keep validation green before review
 6. perform a critical audit review
 7. close on PASS, retry on REVISE up to a limit, then escalate
@@ -109,6 +109,7 @@ Requirements for the worker task:
 - read `tk notes <ticket-id>`
 - gather all relevant code context before editing
 - implement only this ticket
+- do not run the repo validation loop in this step
 - write `ticket-flow/<ticket-id>/implementation.md` with `status: ready-for-validation` or `blocked`
 - do not close the ticket
 - do not add ticket notes

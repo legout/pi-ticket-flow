@@ -34,7 +34,7 @@ It bundles:
 - `/review-deep` — deep parallel multi-lens code review with final consolidation
 - `/refactor-deep` — deeper refactoring analysis with optional research
 - `/simplify-deep` — deeper simplification analysis with optional research
-- `/ticketize` — convert ExecPlan milestones into tk tickets with dependencies and ExecPlan references
+- `/ticketize` — convert ExecPlan milestones into dependency-aware tk tickets with ExecPlan references and scheduling hints
 - `/plan-and-build <topic>` — full pipeline: plan → ticketize → ticket-queue
 
 ### Execution Commands
@@ -157,7 +157,7 @@ Planning skills:
 - `architect` — create/update ARCHITECTURE.md
 - `execplan-create` — self-contained ExecPlan creation following PLANS.md spec
 - `execplan-improve` — 7-criteria audit with Ousterhout lens and usefulness scoring
-- `ticketize` — ExecPlan milestones to tk tickets with ExecPlan references
+- `ticketize` — ExecPlan milestones to dependency-aware tk tickets with ExecPlan references and scheduling hints
 - `update-architecture` — post-implementation architecture sync
 
 Workflow skills:

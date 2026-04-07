@@ -1,6 +1,6 @@
 ---
 name: ticket-implement
-description: Implement the currently selected ticket using the worker agent. Parses ticket-flow state, validates stage, implements exactly one ticket, and writes the implementation artifact in ready-for-validation or blocked state.
+description: Implement the currently selected ticket using the worker agent. Parses ticket-flow state, validates stage, implements exactly one ticket, and writes the implementation artifact in ready-for-validation or blocked state without running the repo validation loop.
 ---
 
 # Ticket Implement
@@ -9,7 +9,7 @@ You are implementing the **currently selected ticket** in the ticket-flow workfl
 
 Your job is to implement exactly one ticket, gather the right local context, and write the durable implementation artifact expected by the workflow.
 
-You are **not** responsible for the full validation/fix-to-green loop. That is handled by the separate `ticket-test-fix` step.
+You are **not** responsible for validation in this step. The full validation/fix-to-green loop is handled by the separate `ticket-test-fix` step.
 
 ## Required procedure
 
@@ -33,7 +33,7 @@ You are **not** responsible for the full validation/fix-to-green loop. That is h
 9. Gather all relevant repo context before editing.
 10. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while implementing.
 11. Implement exactly this ticket.
-12. Run only quick, best-effort sanity checks when obviously useful, but do **not** spend an extended loop trying to get the repo fully green.
+12. Do **not** run the repo's validation commands in this step. Leave tests, lint, typecheck, build, and fix-to-green work entirely to `ticket-test-fix`.
 13. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
 14. If blocked, write `status: blocked` clearly in the artifact.
 15. Otherwise write `status: ready-for-validation`.
@@ -72,13 +72,12 @@ status: ready-for-validation | blocked
 
 ## Validation
 
-- <command you ran>: PASS | FAIL | N/A
-- <repeat one bullet per validation command>
+- deferred to `ticket-test-fix`
 
 ## Validation Evidence
 
 ```text
-<paste concise command outputs or the decisive lines>
+deferred to `ticket-test-fix`
 ```
 
 ## Remaining Issues
@@ -86,7 +85,7 @@ status: ready-for-validation | blocked
 - <known remaining issues, or `none`>
 ````
 
-For the implementation step, it is acceptable for the Validation section to contain only quick sanity checks or `N/A` placeholders when full validation is deferred to `ticket-test-fix`.
+For the implementation step, prefer leaving validation explicitly deferred to `ticket-test-fix` rather than running validation commands here.
 
 If blocked, replace `Remaining Issues` with clear blockers and the exact failing command/output.
 
@@ -96,4 +95,4 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not redesign the workflow
 - Do not spawn subagents
 - Keep changes focused to the selected ticket
-- Leave the full validation/fix loop to `ticket-test-fix`
+- Leave all validation and fix-to-green work to `ticket-test-fix`
