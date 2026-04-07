@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import { parseFrontmatter } from "@mariozechner/pi-coding-agent";
 import { parseChainDeclaration } from "./chain-parser.js";
@@ -30,7 +31,7 @@ export const RESERVED_COMMAND_NAMES = new Set([
 	"quit",
 ]);
 
-export type PromptSource = "user" | "project";
+export type PromptSource = "package" | "user" | "project";
 
 export interface PromptWithModel {
 	name: string;
@@ -66,6 +67,10 @@ export interface PromptLoaderDiagnostic {
 export interface LoadPromptsWithModelResult {
 	prompts: Map<string, PromptWithModel>;
 	diagnostics: PromptLoaderDiagnostic[];
+}
+
+function getBundledPromptDir(): string {
+	return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "prompts");
 }
 
 function createDiagnostic(
@@ -786,6 +791,7 @@ function loadPromptsWithModelFromDir(
 }
 
 export function loadPromptsWithModel(cwd: string): LoadPromptsWithModelResult {
+	const packageDir = getBundledPromptDir();
 	const globalDir = join(homedir(), ".pi", "agent", "prompts");
 	const projectDir = resolve(cwd, ".pi", "prompts");
 	const promptMap = new Map<string, PromptWithModel>();
@@ -811,6 +817,13 @@ export function loadPromptsWithModel(cwd: string): LoadPromptsWithModelResult {
 		}
 
 		promptMap.set(prompt.name, prompt);
+	}
+
+	// Load bundled package prompts first so user/project prompt templates can override them.
+	const packageResult = loadPromptsWithModelFromDir(packageDir, "package");
+	diagnostics.push(...packageResult.diagnostics);
+	for (const prompt of packageResult.prompts) {
+		addPrompt(prompt);
 	}
 
 	const globalResult = loadPromptsWithModelFromDir(globalDir, "user");
