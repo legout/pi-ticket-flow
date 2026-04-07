@@ -1,5 +1,9 @@
 # Unreleased
 
+## Bug Fixes
+
+- Fixed `--model` and `--cwd` flag parsing to support space-separated values (`--model kimi-coding/k2p5`) in addition to equals format (`--model=kimi-coding/k2p5`). Previously, only the equals format was recognized, causing CLI model overrides to be ignored when using the more common space-separated syntax.
+
 # pi-ticket-flow v0.4.2
 
 This patch release adds Diátaxis-style documentation and clarifies delegated prompt behavior.

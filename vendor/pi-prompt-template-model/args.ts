@@ -257,10 +257,48 @@ export function extractSubagentOverride(argsString: string): SubagentOverrideExt
 			continue;
 		}
 
+		if (token === "--cwd") {
+			let lookahead = i;
+			while (lookahead < argsString.length && /\s/.test(argsString[lookahead])) lookahead++;
+
+			if (lookahead < argsString.length && argsString[lookahead] !== '"' && argsString[lookahead] !== "'") {
+				const nextTokenStart = lookahead;
+				while (lookahead < argsString.length && !/\s/.test(argsString[lookahead])) lookahead++;
+				const nextToken = argsString.slice(nextTokenStart, lookahead);
+
+				if (nextToken && !nextToken.startsWith("--")) {
+					tokensToRemove.push({ start: tokenStart, end: i }, { start: nextTokenStart, end: lookahead });
+					cwdRaw = nextToken;
+					i = lookahead;
+					continue;
+				}
+			}
+			continue;
+		}
+
 		if (token.startsWith("--model=")) {
 			tokensToRemove.push({ start: tokenStart, end: i });
 			const value = token.slice("--model=".length);
 			modelRaw = value || undefined;
+			continue;
+		}
+
+		if (token === "--model") {
+			let lookahead = i;
+			while (lookahead < argsString.length && /\s/.test(argsString[lookahead])) lookahead++;
+
+			if (lookahead < argsString.length && argsString[lookahead] !== '"' && argsString[lookahead] !== "'") {
+				const nextTokenStart = lookahead;
+				while (lookahead < argsString.length && !/\s/.test(argsString[lookahead])) lookahead++;
+				const nextToken = argsString.slice(nextTokenStart, lookahead);
+
+				if (nextToken && !nextToken.startsWith("--")) {
+					tokensToRemove.push({ start: tokenStart, end: i }, { start: nextTokenStart, end: lookahead });
+					modelRaw = nextToken;
+					i = lookahead;
+					continue;
+				}
+			}
 			continue;
 		}
 
