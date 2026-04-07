@@ -28,6 +28,7 @@ ticket: reset
 ticket_path: none
 stage: done
 implementation_artifact: none
+validation_artifact: none
 review_artifact: none
 reason: manual reset via /ticket-reset
 ```

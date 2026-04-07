@@ -59,13 +59,14 @@ Add only durable, reusable lessons learned from implementing tickets.
    - `ticket_path:`
    - `stage:`
    - `implementation_artifact:`
+   - `validation_artifact:`
    - `review_artifact:`
 3. If parsing fails, stop and tell the user to run `/ticket-reset`.
 4. If `ticket-flow/current.md` exists and its `stage` is not `done`, stop and report that there is already unfinished orchestrator state.
    - Tell the user to use `/ticket-reset` to clear stale state and retry.
 5. Run `tk ready`.
 6. If no ready tickets exist:
-   - **Queue run:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`. Write a queue-complete tombstone to `ticket-flow/current.md` (`ticket: none`, `reason: queue complete`). Call `signal_loop_success`. Stop.
+   - **Queue run:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`. Write a queue-complete tombstone to `ticket-flow/current.md` with `ticket: none`, `ticket_path: none`, `stage: done`, `implementation_artifact: none`, `validation_artifact: none`, `review_artifact: none`, and `reason: queue complete`. Call `signal_loop_success`. Stop.
    - **Single-ticket run:** report that there are no ready tickets and stop.
 7. Inspect candidates in listed order:
    - prefer tickets already marked `[in_progress]`
@@ -74,21 +75,23 @@ Add only durable, reusable lessons learned from implementing tickets.
    - If the notes contain `Gate: ESCALATE`, skip that ticket.
 9. Pick the first eligible ticket.
 10. If no eligible ticket remains:
-    - **Queue run:** same as step 6 queue path (progress → tombstone → `signal_loop_success` → stop).
+    - **Queue run:** same as step 6 queue path (progress → tombstone including `validation_artifact: none` → `signal_loop_success` → stop).
     - **Single-ticket run:** report that all ready tickets are escalated or ineligible and stop.
 11. If the chosen ticket is not already `in_progress`, run `tk start <ticket-id>`.
-12. Write `ticket-flow/current.md` with:
+12. Generate a unique `<run-token>` for this ticket-flow attempt (for example an ISO-8601 UTC timestamp without punctuation, or another short unique token) and use the same token in all three artifact filenames below.
+13. Write `ticket-flow/current.md` with:
 
 ```md
 ticket: <ticket-id>
 ticket_path: .tickets/<ticket-id>.md
 stage: waiting-worker
-implementation_artifact: ticket-flow/<ticket-id>/implementation.md
-review_artifact: ticket-flow/<ticket-id>/review.md
+implementation_artifact: ticket-flow/<ticket-id>/implementation-<run-token>.md
+validation_artifact: ticket-flow/<ticket-id>/validation-<run-token>.md
+review_artifact: ticket-flow/<ticket-id>/review-<run-token>.md
 ```
 
-13. **Queue run only:** update `ticket-flow/progress.md` by preserving the existing counters/history but setting:
+14. **Queue run only:** update `ticket-flow/progress.md` by preserving the existing counters/history but setting:
     - `status: running`
     - `last_updated: <now>`
     - `current_ticket: <ticket-id>`
-14. End with a short summary including the selected ticket id.
+15. End with a short summary including the selected ticket id.

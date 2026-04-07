@@ -19,6 +19,7 @@ You are **not** responsible for validation in this step. The full validation/fix
    - `ticket_path:`
    - `stage:`
    - `implementation_artifact:`
+   - `validation_artifact:`
    - `review_artifact:`
 3. If parsing fails, stop and tell the user to run `/ticket-reset`.
 4. Extract:
@@ -26,6 +27,7 @@ You are **not** responsible for validation in this step. The full validation/fix
    - `ticket_path`
    - `stage`
    - `implementation_artifact`
+   - `validation_artifact`
 5. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for implementation.
 6. If `stage` is not `waiting-worker`, stop and report that implementation can only run from the `waiting-worker` stage.
 7. Read the ticket file.
@@ -37,7 +39,7 @@ You are **not** responsible for validation in this step. The full validation/fix
 13. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
 14. If blocked, write `status: blocked` clearly in the artifact.
 15. Otherwise write `status: ready-for-validation`.
-16. Overwrite `ticket-flow/current.md` so the selected ticket stays the same but `stage: waiting-validation`.
+16. Do **not** overwrite `ticket-flow/current.md`; the main-session orchestrator owns state transitions.
 17. Do not call `tk add-note`.
 18. Do not call `tk close`.
 19. End with a short summary naming the ticket id and artifact path.
@@ -46,7 +48,7 @@ You are **not** responsible for validation in this step. The full validation/fix
 
 Write exactly one artifact at:
 
-`ticket-flow/<ticket-id>/implementation.md`
+`ticket-flow/<ticket-id>/implementation-<run-token>.md`
 
 Use this format:
 

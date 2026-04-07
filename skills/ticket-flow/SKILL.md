@@ -26,9 +26,9 @@ For one ticket only:
 1. **One ticket only.** Never start or review multiple tickets in one invocation.
 2. **No parallel ticket execution.** Do not start a second ticket while one is active.
 3. **Fresh subagents only.** Worker and reviewer must run with fresh context (`fork: false`).
-4. **Main session is the orchestrator only.** It may read files, call `tk`, spawn subagents, read artifacts, and finalize ticket state. It should not implement product code itself.
+4. **Main session is the orchestrator only.** It may read files, call `tk`, spawn subagents, read artifacts, and finalize ticket state. It should not implement product code itself or run the validation/fix loop itself.
 5. **Use artifacts as the source of truth.** Do not rely on memory alone.
-6. **Parse orchestrator state strictly.** `ticket-flow/current.md` must contain exactly one line for each required key: `ticket:`, `ticket_path:`, `stage:`, `implementation_artifact:`, `review_artifact:`. If malformed, stop and ask for `/ticket-reset`.
+6. **Parse orchestrator state strictly.** `ticket-flow/current.md` must contain exactly one line for each required key: `ticket:`, `ticket_path:`, `stage:`, `implementation_artifact:`, `validation_artifact:`, `review_artifact:`. If malformed, stop and ask for `/ticket-reset`.
 7. **Do not respawn duplicate subagents.** If a stage is already waiting on a worker/reviewer artifact and the artifact is still missing, stop and wait.
 8. **Only close on PASS.** If review is REVISE, add notes and leave the ticket `in_progress`.
 9. **Max failed reviews per ticket: 3.** On the 3rd failed review, add an escalation note instead of retrying again.
@@ -40,8 +40,9 @@ For one ticket only:
 Use these artifact paths:
 
 - `ticket-flow/current.md` — orchestrator state for the current ticket
-- `ticket-flow/<ticket-id>/implementation.md` — worker output
-- `ticket-flow/<ticket-id>/review.md` — reviewer output
+- `ticket-flow/<ticket-id>/implementation-<run-token>.md` — implementation worker output for one ticket-flow attempt
+- `ticket-flow/<ticket-id>/validation-<run-token>.md` — validation worker output for the same attempt
+- `ticket-flow/<ticket-id>/review-<run-token>.md` — reviewer output for the same attempt
 - `ticket-flow/progress.md` — queue progress and ticket history
 - `ticket-flow/lessons-learned.md` — reusable lessons learned across tickets
 
@@ -53,8 +54,9 @@ Use this format exactly:
 ticket: <ticket-id>
 ticket_path: .tickets/<ticket-id>.md
 stage: waiting-worker | waiting-validation | waiting-review | done
-implementation_artifact: ticket-flow/<ticket-id>/implementation.md
-review_artifact: ticket-flow/<ticket-id>/review.md
+implementation_artifact: ticket-flow/<ticket-id>/implementation-<run-token>.md
+validation_artifact: ticket-flow/<ticket-id>/validation-<run-token>.md
+review_artifact: ticket-flow/<ticket-id>/review-<run-token>.md
 ```
 
 ## Stage Machine
@@ -71,11 +73,11 @@ At the start of every invocation:
    - if the implementation artifact contains `status: blocked`, escalate immediately, mark `ticket-flow/current.md` as `done`, and stop
    - if the implementation artifact contains `status: ready-for-validation`, update `ticket-flow/current.md` to `stage: waiting-validation`, then spawn the validation step and stop
 4. If it exists and `stage: waiting-validation`:
-   - try to read `implementation_artifact`
-   - if the implementation artifact is missing, **do not spawn another validation worker**; report that the workflow is waiting for validation and stop
-   - if the implementation artifact contains `status: blocked`, escalate immediately, mark `ticket-flow/current.md` as `done`, and stop
-   - if the implementation artifact contains `status: ready-for-validation`, report that validation is in progress and stop
-   - if the implementation artifact contains `status: ready-for-review`, continue to the review-prep step (the `ticket-mark-review` prompt will advance the stage)
+   - try to read `validation_artifact`
+   - if the validation artifact is missing, **do not spawn another validation worker**; report that the workflow is waiting for validation to finish and write the validation artifact, then stop
+   - if the validation artifact contains `status: blocked`, escalate immediately, mark `ticket-flow/current.md` as `done`, and stop
+   - if the validation artifact contains `status: ready-for-review`, continue to the review-prep step (the `ticket-mark-review` prompt will advance the stage)
+   - otherwise stop and report that the validation artifact is present but not yet in a reviewable state
 6. If it exists and `stage: waiting-review`:
    - try to read `review_artifact`
    - if the review artifact is missing, **do not spawn another reviewer**; report that the workflow is waiting for the reviewer and stop
@@ -110,7 +112,7 @@ Requirements for the worker task:
 - gather all relevant code context before editing
 - implement only this ticket
 - do not run the repo validation loop in this step
-- write `ticket-flow/<ticket-id>/implementation.md` with `status: ready-for-validation` or `blocked`
+- write the exact `implementation_artifact` path from `ticket-flow/current.md` with `status: ready-for-validation` or `blocked`
 - do not close the ticket
 - do not add ticket notes
 - if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
@@ -127,12 +129,12 @@ When the implementation artifact exists and is `ready-for-validation`:
 
 Requirements for the validation task:
 - read `.tickets/<ticket-id>.md`
-- read `ticket-flow/<ticket-id>/implementation.md`
+- read the exact `implementation_artifact` path from `ticket-flow/current.md`
 - run the repo's relevant validation commands
 - prefer documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`
 - include commands such as `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them
 - fix issues until all pass or are genuinely blocked
-- update `ticket-flow/<ticket-id>/implementation.md` to `ready-for-review` or `blocked`
+- write the exact `validation_artifact` path from `ticket-flow/current.md` with `status: ready-for-review` or `blocked`
 - do not close the ticket
 - do not add ticket notes
 - if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
@@ -141,7 +143,7 @@ The orchestrator must set `fork: false` when spawning the validation worker.
 
 ## Review Spawn
 
-When the implementation artifact exists and is `ready-for-review`:
+When the validation artifact exists and is `ready-for-review`:
 
 1. Update `ticket-flow/current.md` to `stage: waiting-review`
 2. Spawn a fresh subagent using the base `reviewer` agent with the `ticket-review` workflow contract
@@ -149,10 +151,11 @@ When the implementation artifact exists and is `ready-for-review`:
 
 Requirements for the reviewer task:
 - read `.tickets/<ticket-id>.md`
-- read `ticket-flow/<ticket-id>/implementation.md`
+- read the exact `implementation_artifact` path from `ticket-flow/current.md`
+- read the exact `validation_artifact` path from `ticket-flow/current.md`
 - inspect the current diff
 - critically audit correctness, acceptance criteria, quality, and edge cases
-- write `ticket-flow/<ticket-id>/review.md`
+- write the exact `review_artifact` path from `ticket-flow/current.md`
 - do not edit code
 - do not close the ticket
 - do not add ticket notes
@@ -164,10 +167,10 @@ The orchestrator must set `fork: false` when spawning the reviewer.
 
 When the review artifact exists:
 
-1. Read `ticket-flow/<ticket-id>/review.md`
+1. Read the exact `review_artifact` path from `ticket-flow/current.md`
 2. Parse `gate: PASS` or `gate: REVISE`
-3. Read the implementation artifact for summary/validation details
-4. If the implementation artifact says `status: blocked`, add an escalation note and stop review finalization
+3. Read the validation artifact for validation details
+4. If the validation artifact says `status: blocked`, add an escalation note and stop review finalization
 5. Run `tk notes <ticket-id>` and count existing failed review cycles by counting prior notes containing `Gate: REVISE`
 6. Add a ticket note with `tk add-note <ticket-id> ...`
 7. If PASS, also run `tk close <ticket-id>`

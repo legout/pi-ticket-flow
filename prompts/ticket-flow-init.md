@@ -51,8 +51,9 @@ When writing complex features or significant refactors, use an ExecPlan (as desc
 ## Artifact locations
 
 - `ticket-flow/current.md`
-- `ticket-flow/<ticket-id>/implementation.md`
-- `ticket-flow/<ticket-id>/review.md`
+- `ticket-flow/<ticket-id>/implementation-<run-token>.md`
+- `ticket-flow/<ticket-id>/validation-<run-token>.md`
+- `ticket-flow/<ticket-id>/review-<run-token>.md`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
 

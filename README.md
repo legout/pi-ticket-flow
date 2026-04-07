@@ -209,8 +209,9 @@ Recommended workflow guidance files:
 
 Artifacts used by the workflow:
 - `ticket-flow/current.md`
-- `ticket-flow/<ticket-id>/implementation.md`
-- `ticket-flow/<ticket-id>/review.md`
+- `ticket-flow/<ticket-id>/implementation-<run-token>.md`
+- `ticket-flow/<ticket-id>/validation-<run-token>.md`
+- `ticket-flow/<ticket-id>/review-<run-token>.md`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
 
