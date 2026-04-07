@@ -29,6 +29,8 @@ interface DelegatedSubagentTask {
   agent: string;
   task: string;
   model?: string;
+  skill?: string;
+  thinking?: string;
 }
 
 interface DelegatedSubagentRequest {
@@ -39,6 +41,8 @@ interface DelegatedSubagentRequest {
   context: "fresh" | "fork";
   model: string;
   cwd: string;
+  skill?: string;
+  thinking?: string;
 }
 
 interface DelegatedSubagentResponse {
@@ -155,6 +159,7 @@ interface RoleMessage {
 
 const runningRequests = new Map<string, { controllers: AbortController[] }>();
 let latestCtx: ExtensionContext | null = null;
+const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 function packageRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,6 +187,32 @@ function parseFrontmatter(content: string): Record<string, string> {
     result[parsed[1]] = parsed[2].trim();
   }
   return result;
+}
+
+function normalizeSkillName(skillName: string): string {
+  return skillName.startsWith("skill:") ? skillName.slice("skill:".length) : skillName;
+}
+
+function parseSkillList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => normalizeSkillName(item.trim()))
+    .filter(Boolean);
+}
+
+function mergeSkillLists(agentSkills: string | undefined, promptSkill: string | undefined): string | undefined {
+  const merged = [...new Set([...parseSkillList(agentSkills), ...parseSkillList(promptSkill)])];
+  return merged.length > 0 ? merged.join(",") : undefined;
+}
+
+function applyThinkingSuffix(model: string | undefined, thinking: string | undefined): string | undefined {
+  if (!model || !thinking || thinking === "off") return model;
+  const colonIndex = model.lastIndexOf(":");
+  if (colonIndex !== -1 && THINKING_LEVELS.has(model.slice(colonIndex + 1))) {
+    return model;
+  }
+  return `${model}:${thinking}`;
 }
 
 function loadAgentDefaults(cwd: string, agentName: string): AgentDefaults | null {
@@ -419,10 +450,10 @@ async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSuba
   }
 
   const taskMessage = buildTaskMessage(agentDefs, taskReq.task, request.context);
-  const effectiveModel = taskReq.model ?? agentDefs.model ?? request.model;
+  const effectiveModel = taskReq.model ?? request.model ?? agentDefs.model;
   const effectiveTools = agentDefs.tools;
-  const effectiveSkills = agentDefs.skills;
-  const effectiveThinking = agentDefs.thinking;
+  const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
+  const effectiveThinking = taskReq.thinking ?? request.thinking ?? agentDefs.thinking;
   const deniedTools = resolveDeniedTools(agentDefs);
   const surface = createSurface(`${taskReq.agent}:${index + 1}`);
   await new Promise<void>((resolve) => setTimeout(resolve, 500));
@@ -454,8 +485,10 @@ async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSuba
   parts.push("-e", shellEscape(subagentDonePath));
 
   if (effectiveModel) {
-    const modelWithThinking = effectiveThinking ? `${effectiveModel}:${effectiveThinking}` : effectiveModel;
-    parts.push("--model", shellEscape(modelWithThinking));
+    const modelWithThinking = applyThinkingSuffix(effectiveModel, effectiveThinking);
+    // Use --models so provider-qualified delegated prompt models reliably win over
+    // the spawned agent's default model in the child pi session.
+    parts.push("--models", shellEscape(modelWithThinking));
   }
 
   if (agentDefs.systemPromptMode && agentDefs.body) {
@@ -502,8 +535,10 @@ async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSuba
     parts.push(`@${artifactPath}`);
   }
 
-  const cwdBase = request.cwd || agentDefs.cwd || ctx.cwd;
-  const effectiveCwd = cwdBase.startsWith("/") ? cwdBase : join(ctx.cwd, cwdBase);
+  const rawCwd = request.cwd || agentDefs.cwd || ctx.cwd;
+  const cwdIsFromAgent = !request.cwd && agentDefs.cwd != null;
+  const cwdBase = cwdIsFromAgent ? getAgentConfigDir() : ctx.cwd;
+  const effectiveCwd = rawCwd.startsWith("/") ? rawCwd : join(cwdBase, rawCwd);
   const envPrefix = envParts.length > 0 ? `${envParts.join(" ")} ` : "";
   const cdPrefix = effectiveCwd ? `cd ${shellEscape(effectiveCwd)} && ` : "";
   const command = `${cdPrefix}${envPrefix}${parts.join(" ")}; echo '__SUBAGENT_DONE_'${exitStatusVar()}'__'`;
@@ -607,7 +642,18 @@ async function watchTask(pi: ExtensionAPI, task: RunningTask, onProgress?: (snap
 }
 
 async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagentRequest, ctx: ExtensionContext) {
-  const task = await launchTask({ agent: request.agent, task: request.task, model: request.model }, request, ctx, 0);
+  const task = await launchTask(
+    {
+      agent: request.agent,
+      task: request.task,
+      model: request.model,
+      skill: request.skill,
+      thinking: request.thinking,
+    },
+    request,
+    ctx,
+    0,
+  );
   runningRequests.set(request.requestId, { controllers: [task.abortController] });
 
   const result = await watchTask(pi, task, (progress) => {

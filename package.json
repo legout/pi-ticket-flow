@@ -24,6 +24,7 @@
   "type": "module",
   "files": [
     "extensions",
+    "vendor",
     "prompts",
     "skills",
     "agents",
@@ -53,7 +54,7 @@
       "./extensions/interactive-subagents-tools.ts",
       "./extensions/interactive-session-artifacts.ts",
       "./extensions/prompt-template-interactive-bridge.ts",
-      "./node_modules/pi-prompt-template-model/index.ts"
+      "./vendor/pi-prompt-template-model/index.ts"
     ],
     "skills": [
       "./skills"

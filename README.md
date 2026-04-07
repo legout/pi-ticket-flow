@@ -109,8 +109,8 @@ pi install npm:pi-ticket-flow
 
 This package uses:
 - `pi-interactive-subagents` as the actual subagent runtime
-- `pi-prompt-template-model` for prompt templates with `subagent:` frontmatter
-- a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime
+- a vendored `pi-prompt-template-model` runtime for prompt templates with `subagent:` frontmatter
+- a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime and preserves delegated prompt model/skill/thinking behavior
 
 The package auto-registers its bundled agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them. This includes the bundled helper agents such as `ticket-smoke`, `researcher`, and `change-planner`. Ticket implementation and review now use the base `worker` and `reviewer` agents from `pi-interactive-subagents` via specialized prompts/skills.
 
