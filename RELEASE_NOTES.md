@@ -1,5 +1,15 @@
 # Unreleased
 
+# pi-ticket-flow v0.4.2
+
+This patch release adds Diátaxis-style documentation and clarifies delegated prompt behavior.
+
+## Highlights
+
+- Added short tutorial, how-to, reference, and explanation docs under `docs/`
+- Documented delegated prompt frontmatter behavior for `subagent:` prompts, including model, thinking, skill, loop, rotate, fresh, and related fields
+- Linked the docs from the root README and included them in the published package
+
 # pi-ticket-flow v0.4.1
 
 This patch release tightens ticket-flow reliability and tunes a few model/runtime defaults.
