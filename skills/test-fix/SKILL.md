@@ -44,7 +44,7 @@ Keep iterating until one of:
 
 After tests pass, run relevant checks that exist in the project:
 - Type checking: `tsc --noEmit`, `mypy`, `pyright`
-- Linting: `eslint`, `pylint`, `ruff check`
+- Linting: `eslint`, `ty check`, `pylint`, `ruff check`
 - Formatting: `prettier --check`, `black --check`
 
 Only run checks that already exist — don't add new tools.

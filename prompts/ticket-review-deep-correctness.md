@@ -1,6 +1,6 @@
 ---
 description: Internal deep ticket review pass — correctness and acceptance criteria
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.4
 subagent: reviewer
 inheritContext: false
 restore: true

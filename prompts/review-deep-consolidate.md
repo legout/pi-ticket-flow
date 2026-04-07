@@ -1,7 +1,7 @@
 ---
 description: Internal deep review consolidation step
-model: openai-codex/gpt-5.4
-thinking: xhigh
+model: openai-codex/gpt-5.4-mini
+thinking: high
 restore: true
 ---
 Consolidate the parallel deep review passes that just ran for: $@

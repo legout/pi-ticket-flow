@@ -1,6 +1,6 @@
 ---
 description: Validate and fix the currently selected ticket using the base worker agent
-model: kimi-coding/k2p5
+model: zai/glm-5.1
 subagent: worker
 inheritContext: false
 skill: ticket-test-fix

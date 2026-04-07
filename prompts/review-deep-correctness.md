@@ -1,6 +1,6 @@
 ---
 description: Internal deep review pass — correctness and logic
-model: openai-codex/gpt-5.4-mini
+model: openai-codex/gpt-5.4
 subagent: reviewer
 inheritContext: true
 skill: review

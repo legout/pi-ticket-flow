@@ -1,7 +1,7 @@
 ---
 description: Internal deep ticket review consolidation step
-model: openai-codex/gpt-5.4
-thinking: xhigh
+model: openai-codex/gpt-5.4-mini
+thinking: high
 restore: true
 ---
 Perform the final consolidation for the deep review of the currently selected ticket.

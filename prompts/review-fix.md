@@ -1,6 +1,6 @@
 ---
 description: Fix code issues identified in a code review
-model: kimi-coding/k2p5
+model: zai/glm-5-turbo
 thinking: medium
 subagent: worker
 inheritContext: true

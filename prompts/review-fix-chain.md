@@ -1,7 +1,7 @@
 ---
 description: Review code, then fix all issues found — loop until the reviewer approves
 chain: review -> review-fix
-loop: 3
+loop: 5
 fresh: true
 converge: true
 chainContext: summary
