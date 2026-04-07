@@ -23,6 +23,7 @@
   },
   "type": "module",
   "files": [
+    "docs",
     "extensions",
     "vendor",
     "prompts",

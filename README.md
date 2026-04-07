@@ -2,6 +2,15 @@
 
 Standalone pi package for **tk ticket workflows** with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.
 
+## Documentation
+
+The project now includes short Diátaxis-style docs in [`docs/`](docs/README.md):
+
+- [Tutorials](docs/tutorials/get-started.md)
+- [How-to guides](docs/how-to/install-and-init.md)
+- [Reference](docs/reference/commands.md)
+- [Explanation](docs/explanation/workflow-model.md)
+
 It bundles:
 - setup/init command (`/ticket-flow-init`)
 - brainstorming skill (`/brainstorm`)
@@ -113,6 +122,36 @@ This package uses:
 - a small compatibility bridge in this package so prompt-template delegation uses the interactive subagent runtime and preserves delegated prompt model/skill/thinking behavior
 
 The package auto-registers its bundled agents into `~/.pi/agent/agents/` when loaded so the interactive subagent runtime can discover them. This includes the bundled helper agents such as `ticket-smoke`, `researcher`, and `change-planner`. Ticket implementation and review now use the base `worker` and `reviewer` agents from `pi-interactive-subagents` via specialized prompts/skills.
+
+### Prompt-template frontmatter behavior with `subagent:`
+
+When a prompt uses `subagent: ...`, prompt-template frontmatter splits into two categories:
+
+- **parent/orchestrator fields** — handled by `pi-prompt-template-model` before or around delegation
+- **child/subagent fields** — forwarded through the bridge to the spawned subagent session
+
+| Frontmatter | Handled by | Behavior with delegated prompts |
+| --- | --- | --- |
+| `model` | child bridge | forwarded to the spawned subagent; prompt model wins over the base agent default |
+| `thinking` | child bridge | forwarded to the spawned subagent; prompt thinking overrides the base agent default |
+| `skill` | child bridge | forwarded to the spawned subagent; merged with agent skills |
+| `subagent` | parent | selects which agent to delegate to |
+| `inheritContext` | parent + child bridge | controls whether the child starts `fresh` or receives a `fork` of the current session |
+| `cwd` | child bridge | forwarded as the delegated subagent working directory |
+| `loop` | parent | reruns the prompt multiple times; each iteration is a separate delegated subagent run |
+| `rotate` | parent | rotates model/thinking across loop iterations before each delegated run |
+| `fresh` | parent | collapses parent context between loop/chain iterations; does not change child startup mode by itself |
+| `converge` | parent | stops loop/chain iterations early when the delegated run makes no file changes |
+| `restore` | parent | restores the parent session model/thinking after execution |
+| `chain` | parent | orchestrates multiple prompt steps; delegated steps inside the chain are allowed |
+| `chainContext` | parent | prepends prior-step summaries to later delegated chain steps |
+
+Important notes:
+
+- `fresh` and `inheritContext` are different: `inheritContext` controls child startup context, while `fresh` controls parent compaction between iterations.
+- `rotate` only matters when looping.
+- `chain` and `subagent` cannot be combined on the same prompt template, but a chain may contain steps that are delegated prompts.
+- New prompt-template features that affect **child execution** may require explicit bridge updates; parent-only orchestration features usually work automatically once supported by the vendored prompt-template runtime.
 
 ## Tool conflict note
 
