@@ -1,6 +1,6 @@
 ---
 description: Internal deep ticket review pass — validation, tests, and maintainability
-model: zai/glm-5.1
+model: zai/glm-5-turbo
 subagent: reviewer
 inheritContext: false
 restore: true
