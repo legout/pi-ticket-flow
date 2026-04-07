@@ -1,5 +1,29 @@
 # Unreleased
 
+# pi-ticket-flow v0.4.0
+
+Planning and review got sharper, ticketization got smarter, and the ticket workflow now cleanly separates implementation from validation.
+
+## Highlights
+
+- Reworked `/review` and `/review-deep` around the base reviewer agent, including parallel multi-lens deep review with final consolidation
+- Made generic review, refactor, and simplify prompts start fresh and added explicit scope guardrails to avoid biased or invented context
+- Upgraded ExecPlan authoring and improvement guidance to prefer independently verifiable vertical slices with explicit prerequisites, related work, and conflict boundaries
+- Upgraded `/ticketize` to produce dependency-aware tickets with scheduling hints such as `Kind`, `Related to`, `Conflicts with`, `Parallel-safe with`, and suggested worktree isolation
+- Clarified the ticket workflow split so `ticket-implement` only implements and leaves all validation/fix-to-green work to `ticket-test-fix`
+
+## Workflow changes
+
+- `/ticket-flow` and `/ticket-queue` now follow the full chain: `ticket-pick → ticket-implement → ticket-test-fix → ticket-mark-review → ticket-review → ticket-finalize`
+- Ticket implementation artifacts now defer validation evidence to the dedicated validation step instead of mixing the two responsibilities
+- Ticket review continues to run only after validation has completed and the artifact is `ready-for-review`
+
+## Planning and ticketization
+
+- ExecPlans now encourage vertical milestones by default and reserve horizontal milestones for explicit enablers, migrations, prototypes, or cleanup
+- Milestone prose now captures true prerequisites, soft links, parallel-safe slices, and serialization/conflict points for later ticketization
+- `ticketize` now prefers a dependency DAG over mechanical milestone-order chaining and reports ticket kind plus important scheduling hints
+
 ## Review prompt redesign
 
 - Replaced `/review` with a simple single-review prompt using the base `reviewer` agent
