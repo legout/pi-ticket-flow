@@ -1,5 +1,24 @@
 # Unreleased
 
+# pi-ticket-flow v0.4.1
+
+This patch release tightens ticket-flow reliability and tunes a few model/runtime defaults.
+
+## Highlights
+
+- Fixed ticket-flow artifact handoff so implementation, validation, and review each use distinct per-run artifact paths
+- Stopped validation from trying to overwrite implementation artifacts across fresh subagent sessions
+- Updated review/finalization stages to read validation state explicitly, preventing stale artifact reads and repeated validation behavior
+- Tuned prompt model selections for planning, review, and validation flows
+- Increased the `/review-fix-chain` retry budget and documented `ty check` in the generic test-fix guidance
+
+## Ticket-flow reliability
+
+- `ticket-pick` now creates per-run `implementation`, `validation`, and `review` artifact paths
+- `ticket-test-fix` now writes a dedicated validation artifact instead of mutating the implementation artifact
+- `ticket-mark-review`, `ticket-review`, deep ticket review prompts, and `ticket-finalize` now consume the validation artifact explicitly
+- Main-session orchestration remains the owner of `ticket-flow/current.md` state transitions
+
 # pi-ticket-flow v0.4.0
 
 Planning and review got sharper, ticketization got smarter, and the ticket workflow now cleanly separates implementation from validation.
