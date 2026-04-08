@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"fixture-error-429","timestamp":"2026-04-08T09:45:15.496Z","cwd":"/tmp/project"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Validate and fix ticket flo-f891."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"toolCall","name":"read_artifact","arguments":{"name":"ticket-flow/current.md"}}],"stopReason":"toolUse"}}
+{"type":"message","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"429 The service may be temporarily overloaded, please try again later"}}

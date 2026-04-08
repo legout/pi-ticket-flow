@@ -69,7 +69,9 @@ Read `ticket-flow/invocation.md` first.
 17. Read the review artifact. If it is missing, stop and report that finalization cannot proceed because the review artifact is missing.
 18. If the review artifact does not contain a parseable `gate:` field, stop and report that the review artifact is malformed.
 19. Parse `gate: PASS` or `gate: REVISE` from the review artifact.
-20. Run `tk notes <ticket>` and count prior notes containing `Gate: REVISE`.
+20. Inspect existing ticket notes and count prior notes containing `Gate: REVISE`.
+    - Prefer `tk notes <ticket>` when that command exists in this repo's `tk` version.
+    - If `tk notes` is unavailable, use `tk show <ticket>` and inspect the Notes section.
 21. If gate is PASS:
     - add a concise structured PASS note via `tk add-note <ticket> ...`
     - close the ticket via `tk close <ticket>`

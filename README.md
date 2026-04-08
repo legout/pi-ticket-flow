@@ -264,3 +264,4 @@ Artifacts used by the workflow:
 - `/review-deep` is the higher-confidence path for non-ticket code review when you want multiple independent review lenses plus final consolidation.
 - `/ticket-review-deep` is the optional manual high-confidence ticket review path using parallel review passes plus final consolidation.
 - `/bridge-smoke` is the first thing to run after install.
+- Maintainers can run `npm run smoke:delegated-outcome` to regression-test delegated subagent error detection against captured fixture transcripts.

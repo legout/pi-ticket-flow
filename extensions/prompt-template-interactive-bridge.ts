@@ -15,8 +15,15 @@ import {
 } from "../node_modules/pi-interactive-subagents/pi-extension/subagents/cmux.ts";
 import {
   getNewEntries,
-  type SessionEntry,
 } from "../node_modules/pi-interactive-subagents/pi-extension/subagents/session.ts";
+import {
+  extractRoleMessages,
+  getLastAssistantText,
+  getTerminalAssistantFailure,
+  summarizeDelegatedTaskOutcome,
+  type RoleMessage,
+  type SessionEntryLike,
+} from "./delegated-subagent-outcome.ts";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -132,20 +139,6 @@ interface TaskResult {
   errorText?: string;
 }
 
-interface MessageBlock {
-  type?: string;
-  text?: string;
-  name?: string;
-  arguments?: Record<string, unknown>;
-}
-
-interface RoleMessage {
-  role?: string;
-  model?: string;
-  usage?: { output?: number; totalTokens?: number };
-  content?: MessageBlock[];
-}
-
 const runningRequests = new Map<string, { controllers: AbortController[] }>();
 let latestCtx: ExtensionContext | null = null;
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
@@ -241,18 +234,6 @@ function getArtifactDir(ctx: ExtensionContext): string {
   return join(ctx.sessionManager.getSessionDir(), "artifacts", ctx.sessionManager.getSessionId());
 }
 
-function parseRoleMessages(entries: SessionEntry[]): RoleMessage[] {
-  const messages: RoleMessage[] = [];
-  for (const entry of entries) {
-    if (entry.type !== "message") continue;
-    const message = (entry as { message?: RoleMessage }).message;
-    if (!message) continue;
-    if (message.role !== "assistant" && message.role !== "user") continue;
-    messages.push(message);
-  }
-  return messages;
-}
-
 function stringifyArgs(args: Record<string, unknown> | undefined, max = 80): string | undefined {
   if (!args) return undefined;
   const raw = JSON.stringify(args);
@@ -316,18 +297,6 @@ function getRecentTools(messages: RoleMessage[], limit = 5): Array<{ tool: strin
     }
   }
   return tools.length > 0 ? tools.slice(-limit) : undefined;
-}
-
-function lastAssistantText(messages: RoleMessage[]): string | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i];
-    if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
-    const texts = message.content
-      .filter((block) => block?.type === "text" && typeof block.text === "string" && block.text.trim())
-      .map((block) => block.text as string);
-    if (texts.length > 0) return texts.join("\n");
-  }
-  return undefined;
 }
 
 function truncateOutputLines(text: string | undefined, maxLines = 8): string[] | undefined {
@@ -597,9 +566,9 @@ function snapshotTask(task: RunningTask): TaskProgressSnapshot {
   }
 
   const entries = getNewEntries(task.sessionFile, task.baselineEntryCount);
-  const messages = parseRoleMessages(entries);
+  const messages = extractRoleMessages(entries as SessionEntryLike[]);
   const { name: currentTool, args: currentToolArgs } = getLastAssistantTool(messages);
-  const outputText = lastAssistantText(messages);
+  const outputText = lastAssistantText(messages) ?? getTerminalAssistantFailure(messages)?.text;
   return {
     status: "running",
     currentTool,
@@ -635,19 +604,18 @@ async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgress
     });
 
     const entries = existsSync(task.sessionFile) ? getNewEntries(task.sessionFile, task.baselineEntryCount) : [];
-    const rawMessages = parseRoleMessages(entries) as unknown[];
-    const summary =
-      lastAssistantText(rawMessages as RoleMessage[]) ??
-      (exitCode === 0 ? `Delegated subagent ${task.agent} completed.` : `Delegated subagent ${task.agent} failed with exit code ${exitCode}.`);
-    const messages = ensureAssistantSummary(rawMessages, summary);
+    const rawRoleMessages = extractRoleMessages(entries as SessionEntryLike[]);
+    const outcome = summarizeDelegatedTaskOutcome(rawRoleMessages, task.agent, exitCode);
+    const rawMessages = rawRoleMessages as unknown[];
+    const messages = ensureAssistantSummary(rawMessages, outcome.summary);
 
     cleanupTask(task);
 
     return {
       agent: task.agent,
       messages,
-      isError: exitCode !== 0,
-      errorText: exitCode !== 0 ? summary : undefined,
+      isError: outcome.isError,
+      errorText: outcome.errorText,
     };
   } catch (error) {
     cleanupTask(task);

@@ -44,7 +44,9 @@ You are **not** responsible for validation in this step. The full validation/fix
 11. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for implementation.
 12. If `stage` is not `waiting-worker`, stop and report that implementation can only run from the `waiting-worker` stage.
 13. Read the ticket file.
-14. Run `tk notes <ticket>`.
+14. Inspect the ticket notes.
+    - Prefer `tk notes <ticket>` when that command exists in this repo's `tk` version.
+    - If `tk notes` is unavailable, use `tk show <ticket>` and inspect the Notes section.
 15. Gather all relevant repo context before editing.
 16. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while implementing.
 17. Implement exactly this ticket.

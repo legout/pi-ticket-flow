@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"fixture-success","timestamp":"2026-04-08T09:52:27.441Z","cwd":"/tmp/project"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Validate and fix ticket flo-f891."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"toolCall","name":"read_artifact","arguments":{"name":"ticket-flow/current.md"}}],"stopReason":"toolUse"}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Validation artifact written to: `ticket-flow/flo-f891/validation-20260408T171628Z.md`"}],"stopReason":"stop"}}

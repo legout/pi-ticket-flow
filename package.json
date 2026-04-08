@@ -22,6 +22,9 @@
     "url": "https://github.com/legout/pi-ticket-flow/issues"
   },
   "type": "module",
+  "scripts": {
+    "smoke:delegated-outcome": "node --experimental-strip-types scripts/smoke-delegated-subagent-outcome.ts"
+  },
   "files": [
     "docs",
     "extensions",

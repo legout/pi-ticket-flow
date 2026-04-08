@@ -110,7 +110,9 @@ When there is no unfinished orchestrator state:
 3. Build the eligible candidate list in this order:
    - prefer listed tickets already marked `[in_progress]`
    - then consider other ready tickets
-4. For each candidate, run `tk notes <ticket-id>` and skip it if the notes already contain `Gate: ESCALATE`
+4. For each candidate, inspect its notes and skip it if they already contain `Gate: ESCALATE`
+   - prefer `tk notes <ticket-id>` when that command exists in this repo's `tk` version
+   - if `tk notes` is unavailable, use `tk show <ticket-id>` and inspect the Notes section
 5. Pick the **first eligible** candidate
 6. If no eligible candidate remains, stop and report that all ready tickets are escalated or ineligible
 7. If the chosen ticket is not already `in_progress`, run:
@@ -125,7 +127,7 @@ Spawn a fresh subagent using the base `worker` agent with the `ticket-implement`
 
 Requirements for the worker task:
 - read `.tickets/<ticket-id>.md`
-- read `tk notes <ticket-id>`
+- inspect the ticket notes (`tk notes <ticket-id>` when available; otherwise `tk show <ticket-id>` and read the Notes section)
 - gather all relevant code context before editing
 - implement only this ticket
 - do not run the repo validation loop in this step
@@ -195,7 +197,9 @@ Procedure:
 4. If the validation artifact says `status: blocked`, add an escalation note that includes the exact line `Gate: ESCALATE`, update `ticket-flow/current.md` to `stage: done`, disarm `ticket-flow/invocation.md`, and stop finalization without requiring a review artifact
 5. Otherwise read the exact `review_artifact` path from `ticket-flow/current.md`
 6. Parse `gate: PASS` or `gate: REVISE`
-7. Run `tk notes <ticket-id>` and count existing failed review cycles by counting prior notes containing `Gate: REVISE`
+7. Inspect existing ticket notes and count failed review cycles by counting prior notes containing `Gate: REVISE`
+   - prefer `tk notes <ticket-id>` when that command exists in this repo's `tk` version
+   - if `tk notes` is unavailable, use `tk show <ticket-id>` and inspect the Notes section
 8. Add a ticket note with `tk add-note <ticket-id> ...`
 9. If PASS, also run `tk close <ticket-id>`
 10. If REVISE and this would be failed review **1 or 2**, add a revise note and leave the ticket `in_progress`
