@@ -19,9 +19,11 @@ Rules:
 Procedure:
 
 1. Try `read_artifact(name: "ticket-flow/current.md")`.
-2. If the artifact does not exist, report that there is nothing to reset and stop.
-3. If it exists, briefly summarize the current `ticket` and `stage` from the artifact.
-4. Overwrite `ticket-flow/current.md` with this tombstone format:
+2. Try `read_artifact(name: "ticket-flow/invocation.md")`.
+3. If both artifacts are missing, report that there is nothing to reset and stop.
+4. If `ticket-flow/current.md` exists, briefly summarize the current `ticket` and `stage` from the artifact.
+5. If `ticket-flow/invocation.md` exists, briefly summarize the current `status`, `mode`, and `ticket` from the artifact.
+6. Overwrite `ticket-flow/current.md` with this tombstone format:
 
 ```md
 ticket: reset
@@ -33,5 +35,15 @@ review_artifact: none
 reason: manual reset via /ticket-reset
 ```
 
-5. Report that orchestrator state was reset successfully.
-6. Stop.
+7. Overwrite `ticket-flow/invocation.md` with this blocked sentinel format:
+
+```md
+status: blocked
+mode: single
+ticket: none
+run_token: none
+reason: manual reset via /ticket-reset
+```
+
+8. Report that orchestrator state was reset successfully.
+9. Stop.

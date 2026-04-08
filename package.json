@@ -33,16 +33,13 @@
     "package.json"
   ],
   "dependencies": {
-    "pi-interactive-subagents": "github:HazAT/pi-interactive-subagents",
-    "pi-prompt-template-model": "^0.6.8"
+    "pi-interactive-subagents": "github:HazAT/pi-interactive-subagents"
   },
   "bundledDependencies": [
-    "pi-interactive-subagents",
-    "pi-prompt-template-model"
+    "pi-interactive-subagents"
   ],
   "bundleDependencies": [
-    "pi-interactive-subagents",
-    "pi-prompt-template-model"
+    "pi-interactive-subagents"
   ],
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",

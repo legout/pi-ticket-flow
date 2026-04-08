@@ -1,5 +1,4 @@
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import { type Component, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { getDelegatedLiveState, type DelegatedSubagentLiveState, type DelegatedSubagentTask, type DelegatedSubagentTaskProgress } from "./subagent-runtime.js";
 
 export const DELEGATED_WIDGET_KEY = "prompt-subagent-progress";
@@ -7,11 +6,7 @@ export const DELEGATED_WIDGET_KEY = "prompt-subagent-progress";
 const ACCENT = "\x1b[38;2;77;163;255m";
 const RST = "\x1b[0m";
 
-interface DelegatedProgressWidget {
-	invalidate(): void;
-	render(width: number): string[];
-	dispose?(): void;
-}
+type DelegatedProgressWidget = Component & { dispose?(): void };
 
 function formatElapsedMMSS(startTime: number): string {
 	const seconds = Math.floor((Date.now() - startTime) / 1000);
@@ -145,11 +140,7 @@ function renderParallelWidgetLines(
 export function createDelegatedProgressWidget(
 	requestId: string,
 	agent: string,
-	_context: "fresh" | "fork",
-	_task: string,
 	tasks: DelegatedSubagentTask[] | undefined,
-	_theme: Theme,
-	_model?: string,
 ): DelegatedProgressWidget {
 	return {
 		invalidate() {},

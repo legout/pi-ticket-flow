@@ -11,45 +11,58 @@ Your job is to take the already-implemented ticket, run the repo's relevant vali
 
 ## Required procedure
 
-1. Read `ticket-flow/current.md` using `read_artifact`.
+1. Read `ticket-flow/invocation.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
+   - `status:`
+   - `mode:`
+   - `ticket:`
+   - `run_token:`
+   - `reason:`
+3. If parsing fails, stop and report that this ticket-flow invocation is not armed for validation.
+4. If `status` is not `armed`, stop and report that validation is not armed for this invocation.
+5. Read `ticket-flow/current.md` using `read_artifact`.
+6. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
    - `ticket_path:`
    - `stage:`
    - `implementation_artifact:`
    - `validation_artifact:`
    - `review_artifact:`
-3. If parsing fails, stop and tell the user to run `/ticket-reset`.
-4. Extract:
+   - optional tombstone line: `reason:`
+7. If parsing fails, stop and tell the user to run `/ticket-reset`.
+8. Extract:
    - `ticket`
    - `ticket_path`
    - `stage`
    - `implementation_artifact`
    - `validation_artifact`
-5. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for validation.
-6. If `stage` is not `waiting-validation`, stop and report that validation can only run from the `waiting-validation` stage.
-7. Read the ticket file.
-8. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while validating/fixing.
-9. Read the implementation artifact. If it is missing, stop and report that validation cannot proceed because implementation has not completed.
-10. If the implementation artifact indicates `status: blocked`, stop and report that validation cannot proceed because implementation is blocked.
-11. If a validation artifact already exists at `validation_artifact` and indicates `status: ready-for-review`, report that validation is already complete and stop.
-12. Run and fix until green using the repo's relevant validation commands.
+   - `review_artifact`
+9. If the invocation `ticket` does not match the selected `ticket`, stop and report that the invocation guard does not match the selected ticket.
+10. If any of `implementation_artifact`, `validation_artifact`, or `review_artifact` does not contain the invocation `run_token`, stop and report that the invocation guard does not match the selected attempt.
+11. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for validation.
+12. If `stage` is not `waiting-validation`, stop and report that validation can only run from the `waiting-validation` stage.
+13. If a validation artifact already exists at `validation_artifact` and indicates `status: ready-for-review` or `status: blocked`, report that validation status is already recorded and stop.
+14. Read the implementation artifact. If it is missing, stop and report that validation cannot proceed because implementation has not completed.
+15. If the implementation artifact indicates `status: blocked`, stop and report that validation cannot proceed because implementation is blocked.
+16. Read the ticket file.
+17. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while validating/fixing.
+18. Run and fix until green using the repo's relevant validation commands.
    - Prefer the project's documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`.
    - If the repo clearly uses commands such as `uv run`, `ty check`, `mypy src/`, or `pytest tests/ -x -v`, include the appropriate invocation form for this repo.
    - Fix issues until all relevant commands pass or you are genuinely blocked.
-13. Write the validation artifact to the exact `validation_artifact` path from `ticket-flow/current.md`:
+19. Write the validation artifact to the exact `validation_artifact` path from `ticket-flow/current.md`:
    - set `status: ready-for-review` if validation is green
    - set `status: blocked` if validation is genuinely blocked
    - preserve and refresh the Summary / Files Changed / Context Used sections from the implementation artifact when helpful
    - write the Validation / Validation Evidence / Remaining Issues sections with the current truth
-14. Do **not** overwrite `ticket-flow/current.md`; the main-session orchestrator and `ticket-mark-review` own stage transitions.
-15. Do not call `tk add-note`.
-16. Do not call `tk close`.
-17. End with a short summary naming the ticket id, final status, and validation artifact path.
+20. Do **not** overwrite `ticket-flow/current.md`; the main-session orchestrator and `ticket-mark-review` own stage transitions.
+21. Do not call `tk add-note`.
+22. Do not call `tk close`.
+23. End with a short summary naming the ticket id, final status, and validation artifact path.
 
 ## Artifact contract
 
-Write exactly one artifact at:
+Write exactly one validation artifact at:
 
 `ticket-flow/<ticket-id>/validation-<run-token>.md`
 

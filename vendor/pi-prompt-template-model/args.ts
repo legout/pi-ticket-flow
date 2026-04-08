@@ -19,12 +19,83 @@ export interface SubagentOverride {
 export interface SubagentOverrideExtraction {
 	args: string;
 	override?: SubagentOverride;
+	explicitOverride?: boolean;
 	cwd?: string;
 	model?: string;
 	fork?: boolean;
+	errors?: string[];
+}
+
+interface ScannedToken {
+	start: number;
+	end: number;
+	value: string;
+	quoted: boolean;
+}
+
+function scanArgsTokens(input: string): ScannedToken[] {
+	const tokens: ScannedToken[] = [];
+	let i = 0;
+
+	while (i < input.length) {
+		while (i < input.length && /\s/.test(input[i])) i++;
+		if (i >= input.length) break;
+
+		const start = i;
+		let inQuote: string | null = null;
+		let value = "";
+		let sawQuoted = false;
+		let sawUnquoted = false;
+
+		while (i < input.length) {
+			const char = input[i];
+			if (inQuote) {
+				if (char === inQuote) {
+					inQuote = null;
+				} else {
+					value += char;
+				}
+				i++;
+				continue;
+			}
+
+			if (char === '"' || char === "'") {
+				inQuote = char;
+				sawQuoted = true;
+				i++;
+				continue;
+			}
+			if (/\s/.test(char)) break;
+
+			value += char;
+			sawUnquoted = true;
+			i++;
+		}
+
+		tokens.push({
+			start,
+			end: i,
+			value,
+			quoted: sawQuoted && !sawUnquoted,
+		});
+	}
+
+	return tokens;
+}
+
+function stripTokenRanges(input: string, ranges: Array<{ start: number; end: number }>): string {
+	if (ranges.length === 0) return input.trim();
+
+	const sorted = [...ranges].sort((a, b) => b.start - a.start);
+	let cleaned = input;
+	for (const { start, end } of sorted) {
+		cleaned = cleaned.slice(0, start) + cleaned.slice(end);
+	}
+	return cleaned.trim();
 }
 
 export function extractLoopCount(argsString: string): LoopExtraction | null {
+	const tokens = scanArgsTokens(argsString);
 	let loopCount: number | null = null;
 	let loopFound = false;
 	let fresh = false;
@@ -32,30 +103,13 @@ export function extractLoopCount(argsString: string): LoopExtraction | null {
 	const tokensToRemove: Array<{ start: number; end: number }> = [];
 	const loopTokenRanges: Array<{ start: number; end: number }> = [];
 
-	let i = 0;
-	while (i < argsString.length) {
-		const char = argsString[i];
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i]!;
+		if (token.quoted) continue;
 
-		if (char === '"' || char === "'") {
-			const quote = char;
-			i++;
-			while (i < argsString.length && argsString[i] !== quote) i++;
-			if (i < argsString.length) i++;
-			continue;
-		}
-
-		if (/\s/.test(char)) {
-			i++;
-			continue;
-		}
-
-		const tokenStart = i;
-		while (i < argsString.length && !/\s/.test(argsString[i])) i++;
-		const token = argsString.slice(tokenStart, i);
-
-		if (token.startsWith("--loop=")) {
-			loopTokenRanges.push({ start: tokenStart, end: i });
-			const value = token.slice("--loop=".length);
+		if (token.value.startsWith("--loop=")) {
+			loopTokenRanges.push({ start: token.start, end: token.end });
+			const value = token.value.slice("--loop=".length);
 			if (/^\d+$/.test(value)) {
 				const parsed = parseInt(value, 10);
 				if (parsed >= 1 && parsed <= 999 && !loopFound) {
@@ -66,28 +120,20 @@ export function extractLoopCount(argsString: string): LoopExtraction | null {
 			continue;
 		}
 
-		if (token === "--loop") {
-			let lookahead = i;
-			while (lookahead < argsString.length && /\s/.test(argsString[lookahead])) lookahead++;
-
-			if (lookahead < argsString.length && argsString[lookahead] !== '"' && argsString[lookahead] !== "'") {
-				const nextTokenStart = lookahead;
-				while (lookahead < argsString.length && !/\s/.test(argsString[lookahead])) lookahead++;
-				const nextToken = argsString.slice(nextTokenStart, lookahead);
-
-				if (/^\d+$/.test(nextToken)) {
-					loopTokenRanges.push({ start: tokenStart, end: i }, { start: nextTokenStart, end: lookahead });
-					const parsed = parseInt(nextToken, 10);
-					if (parsed >= 1 && parsed <= 999 && !loopFound) {
-						loopFound = true;
-						loopCount = parsed;
-					}
-					i = lookahead;
-					continue;
+		if (token.value === "--loop") {
+			const nextToken = tokens[i + 1];
+			if (nextToken && /^\d+$/.test(nextToken.value)) {
+				loopTokenRanges.push({ start: token.start, end: token.end }, { start: nextToken.start, end: nextToken.end });
+				const parsed = parseInt(nextToken.value, 10);
+				if (parsed >= 1 && parsed <= 999 && !loopFound) {
+					loopFound = true;
+					loopCount = parsed;
 				}
+				i++;
+				continue;
 			}
 
-			loopTokenRanges.push({ start: tokenStart, end: i });
+			loopTokenRanges.push({ start: token.start, end: token.end });
 			if (!loopFound) {
 				loopFound = true;
 				loopCount = null;
@@ -95,104 +141,57 @@ export function extractLoopCount(argsString: string): LoopExtraction | null {
 			continue;
 		}
 
-		if (token === "--fresh") {
+		if (token.value === "--fresh") {
 			fresh = true;
-			tokensToRemove.push({ start: tokenStart, end: i });
+			tokensToRemove.push({ start: token.start, end: token.end });
 		}
 
-		if (token === "--no-converge") {
+		if (token.value === "--no-converge") {
 			noConverge = true;
-			tokensToRemove.push({ start: tokenStart, end: i });
+			tokensToRemove.push({ start: token.start, end: token.end });
 		}
 	}
 
 	if (!loopFound) return null;
 
-	const allRanges = [...tokensToRemove, ...loopTokenRanges];
-	allRanges.sort((a, b) => b.start - a.start);
-	let cleaned = argsString;
-	for (const { start, end } of allRanges) {
-		cleaned = cleaned.slice(0, start) + cleaned.slice(end);
-	}
-
 	const converge = !noConverge;
-	return { args: cleaned.trim(), loopCount, fresh, converge };
+	return { args: stripTokenRanges(argsString, [...tokensToRemove, ...loopTokenRanges]), loopCount, fresh, converge };
 }
 
 export function extractLoopFlags(argsString: string): LoopFlags {
+	const tokens = scanArgsTokens(argsString);
 	let fresh = false;
 	let noConverge = false;
 	const tokensToRemove: Array<{ start: number; end: number }> = [];
 
-	let i = 0;
-	while (i < argsString.length) {
-		const char = argsString[i];
+	for (const token of tokens) {
+		if (token.quoted) continue;
 
-		if (char === '"' || char === "'") {
-			const quote = char;
-			i++;
-			while (i < argsString.length && argsString[i] !== quote) i++;
-			if (i < argsString.length) i++;
-			continue;
-		}
-
-		if (/\s/.test(char)) {
-			i++;
-			continue;
-		}
-
-		const tokenStart = i;
-		while (i < argsString.length && !/\s/.test(argsString[i])) i++;
-		const token = argsString.slice(tokenStart, i);
-
-		if (token === "--fresh") {
+		if (token.value === "--fresh") {
 			fresh = true;
-			tokensToRemove.push({ start: tokenStart, end: i });
+			tokensToRemove.push({ start: token.start, end: token.end });
 		}
 
-		if (token === "--no-converge") {
+		if (token.value === "--no-converge") {
 			noConverge = true;
-			tokensToRemove.push({ start: tokenStart, end: i });
+			tokensToRemove.push({ start: token.start, end: token.end });
 		}
 	}
 
-	tokensToRemove.sort((a, b) => b.start - a.start);
-	let cleaned = argsString;
-	for (const { start, end } of tokensToRemove) {
-		cleaned = cleaned.slice(0, start) + cleaned.slice(end);
-	}
-
-	return { args: cleaned.trim(), fresh, converge: !noConverge };
+	return { args: stripTokenRanges(argsString, tokensToRemove), fresh, converge: !noConverge };
 }
 
 export function extractChainContextFlag(argsString: string): { args: string; chainContext: boolean } {
+	const tokens = scanArgsTokens(argsString);
 	let chainContext = false;
 	const tokensToRemove: Array<{ start: number; end: number }> = [];
 
-	let i = 0;
-	while (i < argsString.length) {
-		const char = argsString[i];
+	for (const token of tokens) {
+		if (token.quoted) continue;
 
-		if (char === '"' || char === "'") {
-			const quote = char;
-			i++;
-			while (i < argsString.length && argsString[i] !== quote) i++;
-			if (i < argsString.length) i++;
-			continue;
-		}
-
-		if (/\s/.test(char)) {
-			i++;
-			continue;
-		}
-
-		const tokenStart = i;
-		while (i < argsString.length && !/\s/.test(argsString[i])) i++;
-		const token = argsString.slice(tokenStart, i);
-
-		if (token === "--chain-context") {
+		if (token.value === "--chain-context") {
 			chainContext = true;
-			tokensToRemove.push({ start: tokenStart, end: i });
+			tokensToRemove.push({ start: token.start, end: token.end });
 		}
 	}
 
@@ -200,187 +199,118 @@ export function extractChainContextFlag(argsString: string): { args: string; cha
 		return { args: argsString.trim(), chainContext: false };
 	}
 
-	tokensToRemove.sort((a, b) => b.start - a.start);
-	let cleaned = argsString;
-	for (const { start, end } of tokensToRemove) {
-		cleaned = cleaned.slice(0, start) + cleaned.slice(end);
-	}
-
-	return { args: cleaned.trim(), chainContext };
+	return { args: stripTokenRanges(argsString, tokensToRemove), chainContext };
 }
 
 export function extractSubagentOverride(argsString: string): SubagentOverrideExtraction {
+	const tokens = scanArgsTokens(argsString);
 	let override: SubagentOverride | undefined;
+	let explicitOverride = false;
 	let cwdRaw: string | undefined;
 	let modelRaw: string | undefined;
 	let fork = false;
+	const errors: string[] = [];
 	const tokensToRemove: Array<{ start: number; end: number }> = [];
 
-	let i = 0;
-	while (i < argsString.length) {
-		const char = argsString[i];
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i]!;
+		if (token.quoted) continue;
 
-		if (char === '"' || char === "'") {
-			const quote = char;
-			i++;
-			while (i < argsString.length && argsString[i] !== quote) i++;
-			if (i < argsString.length) i++;
-			continue;
-		}
-
-		if (/\s/.test(char)) {
-			i++;
-			continue;
-		}
-
-		const tokenStart = i;
-		while (i < argsString.length && !/\s/.test(argsString[i])) i++;
-		const token = argsString.slice(tokenStart, i);
-
-		if (token === "--subagent") {
-			tokensToRemove.push({ start: tokenStart, end: i });
+		if (token.value === "--subagent") {
+			tokensToRemove.push({ start: token.start, end: token.end });
 			override = { enabled: true };
+			explicitOverride = true;
 			continue;
 		}
 
-		if (token.startsWith("--subagent=") || token.startsWith("--subagent:")) {
-			tokensToRemove.push({ start: tokenStart, end: i });
-			const value = token.includes("=") ? token.slice("--subagent=".length) : token.slice("--subagent:".length);
+		if (token.value.startsWith("--subagent=") || token.value.startsWith("--subagent:")) {
+			tokensToRemove.push({ start: token.start, end: token.end });
+			const value = token.value.includes("=") ? token.value.slice("--subagent=".length) : token.value.slice("--subagent:".length);
 			override = value ? { enabled: true, agent: value } : { enabled: true };
+			explicitOverride = true;
 			continue;
 		}
 
-		if (token.startsWith("--cwd=")) {
-			tokensToRemove.push({ start: tokenStart, end: i });
-			const value = token.slice("--cwd=".length);
-			cwdRaw = value || undefined;
-			continue;
-		}
-
-		if (token === "--cwd") {
-			let lookahead = i;
-			while (lookahead < argsString.length && /\s/.test(argsString[lookahead])) lookahead++;
-
-			if (lookahead < argsString.length && argsString[lookahead] !== '"' && argsString[lookahead] !== "'") {
-				const nextTokenStart = lookahead;
-				while (lookahead < argsString.length && !/\s/.test(argsString[lookahead])) lookahead++;
-				const nextToken = argsString.slice(nextTokenStart, lookahead);
-
-				if (nextToken && !nextToken.startsWith("--")) {
-					tokensToRemove.push({ start: tokenStart, end: i }, { start: nextTokenStart, end: lookahead });
-					cwdRaw = nextToken;
-					i = lookahead;
-					continue;
-				}
+		if (token.value.startsWith("--cwd=")) {
+			tokensToRemove.push({ start: token.start, end: token.end });
+			const value = token.value.slice("--cwd=".length);
+			if (!value) {
+				errors.push("Missing value for --cwd");
+			} else {
+				cwdRaw = value;
 			}
 			continue;
 		}
 
-		if (token.startsWith("--model=")) {
-			tokensToRemove.push({ start: tokenStart, end: i });
-			const value = token.slice("--model=".length);
-			modelRaw = value || undefined;
-			continue;
-		}
-
-		if (token === "--model") {
-			let lookahead = i;
-			while (lookahead < argsString.length && /\s/.test(argsString[lookahead])) lookahead++;
-
-			if (lookahead < argsString.length && argsString[lookahead] !== '"' && argsString[lookahead] !== "'") {
-				const nextTokenStart = lookahead;
-				while (lookahead < argsString.length && !/\s/.test(argsString[lookahead])) lookahead++;
-				const nextToken = argsString.slice(nextTokenStart, lookahead);
-
-				if (nextToken && !nextToken.startsWith("--")) {
-					tokensToRemove.push({ start: tokenStart, end: i }, { start: nextTokenStart, end: lookahead });
-					modelRaw = nextToken;
-					i = lookahead;
-					continue;
+		if (token.value === "--cwd") {
+			tokensToRemove.push({ start: token.start, end: token.end });
+			const nextToken = tokens[i + 1];
+			if (nextToken && (nextToken.quoted || !nextToken.value.startsWith("--"))) {
+				tokensToRemove.push({ start: nextToken.start, end: nextToken.end });
+				if (!nextToken.value) {
+					errors.push("Missing value for --cwd");
+				} else {
+					cwdRaw = nextToken.value;
 				}
+				i++;
+			} else {
+				errors.push("Missing value for --cwd");
 			}
 			continue;
 		}
 
-		if (token === "--fork") {
-			tokensToRemove.push({ start: tokenStart, end: i });
+		if (token.value.startsWith("--model=")) {
+			tokensToRemove.push({ start: token.start, end: token.end });
+			const value = token.value.slice("--model=".length);
+			if (!value) {
+				errors.push("Missing value for --model");
+			} else {
+				modelRaw = value;
+			}
+			continue;
+		}
+
+		if (token.value === "--model") {
+			tokensToRemove.push({ start: token.start, end: token.end });
+			const nextToken = tokens[i + 1];
+			if (nextToken && (nextToken.quoted || !nextToken.value.startsWith("--"))) {
+				tokensToRemove.push({ start: nextToken.start, end: nextToken.end });
+				if (!nextToken.value) {
+					errors.push("Missing value for --model");
+				} else {
+					modelRaw = nextToken.value;
+				}
+				i++;
+			} else {
+				errors.push("Missing value for --model");
+			}
+			continue;
+		}
+
+		if (token.value === "--fork") {
+			tokensToRemove.push({ start: token.start, end: token.end });
 			fork = true;
 			continue;
 		}
 	}
 
-	if (tokensToRemove.length === 0) return { args: argsString.trim() };
-
-	tokensToRemove.sort((a, b) => b.start - a.start);
-	let cleaned = argsString;
-	for (const { start, end } of tokensToRemove) {
-		cleaned = cleaned.slice(0, start) + cleaned.slice(end);
-	}
+	if (tokensToRemove.length === 0 && errors.length === 0) return { args: argsString.trim() };
 
 	if (fork && !override) override = { enabled: true };
 
 	return {
-		args: cleaned.trim(),
+		args: stripTokenRanges(argsString, tokensToRemove),
 		...(override ? { override } : {}),
+		...(explicitOverride ? { explicitOverride: true } : {}),
 		...(cwdRaw !== undefined ? { cwd: cwdRaw } : {}),
 		...(modelRaw !== undefined ? { model: modelRaw } : {}),
 		...(fork ? { fork: true } : {}),
+		...(errors.length > 0 ? { errors } : {}),
 	};
 }
 
-export function splitByUnquotedSeparator(input: string, separator: string): string[] {
-	const parts: string[] = [];
-	let start = 0;
-	let inQuote: string | null = null;
-
-	for (let i = 0; i < input.length; i++) {
-		const char = input[i];
-		if (inQuote) {
-			if (char === inQuote) inQuote = null;
-		} else if (char === '"' || char === "'") {
-			inQuote = char;
-		} else if (i <= input.length - separator.length && input.startsWith(separator, i)) {
-			parts.push(input.slice(start, i));
-			start = i + separator.length;
-			i += separator.length - 1;
-		}
-	}
-
-	parts.push(input.slice(start));
-	return parts;
-}
-
 export function parseCommandArgs(argsString: string): string[] {
-	const args: string[] = [];
-	let current = "";
-	let inQuote: string | null = null;
-
-	for (let i = 0; i < argsString.length; i++) {
-		const char = argsString[i];
-
-		if (inQuote) {
-			if (char === inQuote) {
-				inQuote = null;
-			} else {
-				current += char;
-			}
-		} else if (char === '"' || char === "'") {
-			inQuote = char;
-		} else if (/\s/.test(char)) {
-			if (current) {
-				args.push(current);
-				current = "";
-			}
-		} else {
-			current += char;
-		}
-	}
-
-	if (current) {
-		args.push(current);
-	}
-
-	return args;
+	return scanArgsTokens(argsString).map((token) => token.value).filter((value) => value.length > 0);
 }
 
 export function substituteArgs(content: string, args: string[]): string {

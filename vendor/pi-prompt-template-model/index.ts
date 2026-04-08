@@ -222,7 +222,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 				return { changed: delegated.changed, text: delegated.text };
 			} catch (error) {
 				notify(ctx, error instanceof Error ? error.message : String(error), "error");
-				return { changed: false };
+				return "aborted";
 			}
 		}
 
@@ -408,7 +408,6 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		const savedModel = getCurrentModel(ctx);
 		const savedThinking = pi.getThinkingLevel();
 		let currentModel = savedModel;
-		let currentThinking = savedThinking;
 		const shouldRestore = initialPrompt.restore;
 		const useFresh = freshFlag || initialPrompt.fresh === true;
 		const effectiveMax = totalIterations ?? UNLIMITED_LOOP_CAP;
@@ -482,7 +481,6 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 				}
 
 				currentModel = getCurrentModel(ctx);
-				currentThinking = pi.getThinkingLevel();
 				completedIterations++;
 
 				const iterationChanged = delegatedStep
@@ -617,7 +615,6 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		const chainInheritedModel = originalModel;
 		const originalThinking = pi.getThinkingLevel();
 		let currentModel = originalModel;
-		let currentThinking = originalThinking;
 		chainActive = true;
 		pendingSkillMessage = undefined;
 		const effectiveMax = totalIterations ?? UNLIMITED_LOOP_CAP;
@@ -729,7 +726,6 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 						lastDelegatedText = delegated.text;
 
 						currentModel = getCurrentModel(ctx);
-						currentThinking = pi.getThinkingLevel();
 						const stepEntries = getIterationEntries(ctx, stepStartId);
 						if (didIterationMakeChanges(stepEntries)) iterationChanged = true;
 						chainStepSummaries.push(generateChainStepSummary(stepEntries, stepLabel, stepNumber));
@@ -800,7 +796,6 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 							}
 
 							currentModel = getCurrentModel(ctx);
-							currentThinking = pi.getThinkingLevel();
 
 							const stepIterationEntries = getIterationEntries(ctx, stepIterationStartId);
 							const stepIterationChanged = didIterationMakeChanges(stepIterationEntries);
@@ -894,6 +889,10 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		}
 
 		const subagent = extractSubagentOverride(args);
+		if (subagent.errors && subagent.errors.length > 0) {
+			notify(ctx, subagent.errors.join("\n"), "error");
+			return;
+		}
 		const runtimeCwd = subagent.cwd ? expandCwdPath(subagent.cwd) : undefined;
 		if (subagent.cwd && !runtimeCwd) {
 			notify(ctx, `Invalid --cwd path: must be absolute`, "error");
@@ -904,6 +903,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		if (prompt.chain) {
 			if (subagent.model) notify(ctx, `--model is not supported on chain prompts (ignored)`, "warning");
 			if (subagent.fork) notify(ctx, `--fork is not supported on chain prompts (ignored)`, "warning");
+			const chainSubagentOverride = subagent.explicitOverride ? subagent.override : undefined;
 			const extracted = extractChainContextFlag(argsWithoutSubagent);
 			const chainContextEnabled = extracted.chainContext || prompt.chainContext === "summary";
 			const loop = extractLoopCount(extracted.args);
@@ -943,7 +943,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 				converge && prompt.converge !== false,
 				prompt.restore,
 				ctx,
-				subagent.override,
+				chainSubagentOverride,
 				cwdOverride,
 				chainContextEnabled,
 			);
@@ -1092,6 +1092,13 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		refreshPrompts(ctx.cwd, ctx);
 
 		const subagent = extractSubagentOverride(args);
+		if (subagent.errors && subagent.errors.length > 0) {
+			notify(ctx, subagent.errors.join("\n"), "error");
+			return;
+		}
+		if (subagent.model) notify(ctx, `--model is not supported on chain prompts (ignored)`, "warning");
+		if (subagent.fork) notify(ctx, `--fork is not supported on chain prompts (ignored)`, "warning");
+		const chainSubagentOverride = subagent.explicitOverride ? subagent.override : undefined;
 		const runtimeCwd = subagent.cwd ? expandCwdPath(subagent.cwd) : undefined;
 		if (subagent.cwd && !runtimeCwd) {
 			notify(ctx, `Invalid --cwd path: must be absolute`, "error");
@@ -1119,7 +1126,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 			loop?.converge ?? true,
 			true,
 			ctx,
-			subagent.override,
+			chainSubagentOverride,
 			runtimeCwd,
 			extracted.chainContext,
 		);

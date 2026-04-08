@@ -40,11 +40,8 @@ export interface DelegatedSubagentRequest {
 
 export interface DelegatedSubagentResponse {
 	requestId: string;
-	agent: string;
-	task: string;
 	context: "fresh" | "fork";
 	model: string;
-	cwd: string;
 	messages: unknown[];
 	parallelResults?: DelegatedSubagentParallelResult[];
 	isError: boolean;

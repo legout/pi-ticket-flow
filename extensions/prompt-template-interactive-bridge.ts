@@ -47,11 +47,8 @@ interface DelegatedSubagentRequest {
 
 interface DelegatedSubagentResponse {
   requestId: string;
-  agent: string;
-  task: string;
   context: "fresh" | "fork";
   model: string;
-  cwd: string;
   messages: unknown[];
   parallelResults?: Array<{
     agent: string;
@@ -91,8 +88,6 @@ interface DelegatedSubagentUpdate {
 }
 
 interface AgentDefaults {
-  name?: string;
-  description?: string;
   model?: string;
   tools?: string;
   skills?: string;
@@ -106,13 +101,9 @@ interface AgentDefaults {
 }
 
 interface RunningTask {
-  requestId: string;
   index: number;
   agent: string;
-  task: string;
   model: string;
-  context: "fresh" | "fork";
-  cwd: string;
   surface: string;
   sessionFile: string;
   baselineEntryCount: number;
@@ -153,13 +144,17 @@ interface RoleMessage {
   model?: string;
   usage?: { output?: number; totalTokens?: number };
   content?: MessageBlock[];
-  stopReason?: string;
-  errorMessage?: string;
 }
 
 const runningRequests = new Map<string, { controllers: AbortController[] }>();
 let latestCtx: ExtensionContext | null = null;
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
+
+function throwIfAborted(abortController: AbortController) {
+  if (abortController.signal.aborted) {
+    throw new Error("Delegated subagent cancelled.");
+  }
+}
 
 function packageRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -206,8 +201,8 @@ function mergeSkillLists(agentSkills: string | undefined, promptSkill: string | 
   return merged.length > 0 ? merged.join(",") : undefined;
 }
 
-function applyThinkingSuffix(model: string | undefined, thinking: string | undefined): string | undefined {
-  if (!model || !thinking || thinking === "off") return model;
+function applyThinkingSuffix(model: string, thinking: string | undefined): string {
+  if (!thinking || thinking === "off") return model;
   const colonIndex = model.lastIndexOf(":");
   if (colonIndex !== -1 && THINKING_LEVELS.has(model.slice(colonIndex + 1))) {
     return model;
@@ -222,8 +217,6 @@ function loadAgentDefaults(cwd: string, agentName: string): AgentDefaults | null
     const fields = parseFrontmatter(content);
     const body = content.replace(/^---\n[\s\S]*?\n---\n*/, "").trim() || undefined;
     return {
-      name: fields["name"] ?? agentName,
-      description: fields["description"],
       model: fields["model"],
       tools: fields["tools"],
       skills: fields["skill"] ?? fields["skills"],
@@ -398,13 +391,18 @@ function buildTaskMessage(agentDefs: AgentDefaults | null, task: string, context
     ? "Your FINAL assistant message should summarize what you accomplished."
     : "Your FINAL assistant message (before calling subagent_done or before the user exits) should summarize what you accomplished.";
 
-  const identity = agentDefs?.body ?? null;
-  const systemPromptMode = agentDefs?.systemPromptMode;
-  const identityInSystemPrompt = systemPromptMode && identity;
-  const roleBlock = identity && !identityInSystemPrompt ? `\n\n${identity}` : "";
+  if (context === "fork") {
+    return task;
+  }
 
-  if (context === "fork") return task;
-  return `${roleBlock}\n\n${modeHint}\n\n${task}\n\n${summaryInstruction}`;
+  const parts = [
+    agentDefs?.body && !agentDefs.systemPromptMode ? agentDefs.body : null,
+    modeHint,
+    task,
+    summaryInstruction,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join("\n\n");
 }
 
 function writeTaskArtifact(ctx: ExtensionContext, name: string, content: string): string {
@@ -436,7 +434,13 @@ function createForkCleanupFile(sourceSessionFile: string): { path: string; basel
   return { path: cleanupPath, baselineEntryCount: cleanLines.length };
 }
 
-async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSubagentRequest, ctx: ExtensionContext, index: number): Promise<RunningTask> {
+async function launchTask(
+  taskReq: DelegatedSubagentTask,
+  request: DelegatedSubagentRequest,
+  ctx: ExtensionContext,
+  index: number,
+  abortController: AbortController,
+): Promise<RunningTask> {
   if (!ctx.sessionManager.getSessionFile()) {
     throw new Error("No session file. Start pi with a persistent session to use delegated subagents.");
   }
@@ -455,110 +459,130 @@ async function launchTask(taskReq: DelegatedSubagentTask, request: DelegatedSuba
   const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
   const effectiveThinking = taskReq.thinking ?? request.thinking ?? agentDefs.thinking;
   const deniedTools = resolveDeniedTools(agentDefs);
-  const surface = createSurface(`${taskReq.agent}:${index + 1}`);
-  await new Promise<void>((resolve) => setTimeout(resolve, 500));
-
   const sessionFile = ctx.sessionManager.getSessionFile()!;
   const sessionDir = dirname(sessionFile);
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23) + "Z";
   const sessionId = `${request.requestId}-${index}-${Math.random().toString(16).slice(2, 10)}`;
   const subagentSessionFile = join(sessionDir, `${timestamp}_${sessionId}.jsonl`);
 
+  let surface: string | undefined;
   let forkCleanupFile: string | undefined;
+  let taskArtifactPath: string | undefined;
   let baselineEntryCount = 0;
 
-  const parts: string[] = ["pi", "--session", shellEscape(subagentSessionFile)];
+  try {
+    throwIfAborted(abortController);
+    surface = createSurface(`${taskReq.agent}:${index + 1}`);
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    throwIfAborted(abortController);
 
-  if (request.context === "fork") {
-    const forkInfo = createForkCleanupFile(sessionFile);
-    forkCleanupFile = forkInfo.path;
-    baselineEntryCount = forkInfo.baselineEntryCount;
-    parts.push("--fork", shellEscape(forkCleanupFile));
-  }
+    const parts: string[] = ["pi", "--session", shellEscape(subagentSessionFile)];
 
-  const subagentDonePath = fileURLToPath(
-    new URL(
-      "../node_modules/pi-interactive-subagents/pi-extension/subagents/subagent-done.ts",
-      import.meta.url,
-    ),
-  );
-  parts.push("-e", shellEscape(subagentDonePath));
-
-  if (effectiveModel) {
-    const modelWithThinking = applyThinkingSuffix(effectiveModel, effectiveThinking);
-    // Use --models so provider-qualified delegated prompt models reliably win over
-    // the spawned agent's default model in the child pi session.
-    parts.push("--models", shellEscape(modelWithThinking));
-  }
-
-  if (agentDefs.systemPromptMode && agentDefs.body) {
-    const flag = agentDefs.systemPromptMode === "replace" ? "--system-prompt" : "--append-system-prompt";
-    parts.push(flag, shellEscape(agentDefs.body));
-  }
-
-  if (effectiveTools) {
-    const BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
-    const builtins = effectiveTools
-      .split(",")
-      .map((tool) => tool.trim())
-      .filter((tool) => BUILTIN_TOOLS.has(tool));
-    if (builtins.length > 0) {
-      parts.push("--tools", shellEscape(builtins.join(",")));
+    if (request.context === "fork") {
+      const forkInfo = createForkCleanupFile(sessionFile);
+      forkCleanupFile = forkInfo.path;
+      baselineEntryCount = forkInfo.baselineEntryCount;
+      parts.push("--fork", shellEscape(forkCleanupFile));
     }
-  }
 
-  if (effectiveSkills) {
-    for (const skill of effectiveSkills.split(",").map((s) => s.trim()).filter(Boolean)) {
-      parts.push(shellEscape(`/skill:${skill}`));
+    const subagentDonePath = fileURLToPath(
+      new URL(
+        "../node_modules/pi-interactive-subagents/pi-extension/subagents/subagent-done.ts",
+        import.meta.url,
+      ),
+    );
+    parts.push("-e", shellEscape(subagentDonePath));
+
+    if (effectiveModel) {
+      const modelWithThinking = applyThinkingSuffix(effectiveModel, effectiveThinking);
+      // Use --models so provider-qualified delegated prompt models reliably win over
+      // the spawned agent's default model in the child pi session.
+      parts.push("--models", shellEscape(modelWithThinking));
     }
-  }
 
-  const envParts: string[] = [];
-  if (process.env.PI_CODING_AGENT_DIR) {
-    envParts.push(`PI_CODING_AGENT_DIR=${shellEscape(process.env.PI_CODING_AGENT_DIR)}`);
-  }
-  if (process.env.PI_SUBAGENT_RUNTIME_ROOT) {
-    envParts.push(`PI_SUBAGENT_RUNTIME_ROOT=${shellEscape(process.env.PI_SUBAGENT_RUNTIME_ROOT)}`);
-  }
-  if (deniedTools.length > 0) {
-    envParts.push(`PI_DENY_TOOLS=${shellEscape(deniedTools.join(","))}`);
-  }
-  envParts.push(`PI_SUBAGENT_NAME=${shellEscape(taskReq.agent)}`);
-  envParts.push(`PI_SUBAGENT_AGENT=${shellEscape(taskReq.agent)}`);
-  if (agentDefs.autoExit) envParts.push("PI_SUBAGENT_AUTO_EXIT=1");
+    if (agentDefs.systemPromptMode && agentDefs.body) {
+      const flag = agentDefs.systemPromptMode === "replace" ? "--system-prompt" : "--append-system-prompt";
+      parts.push(flag, shellEscape(agentDefs.body));
+    }
 
-  if (request.context === "fork") {
-    parts.push(shellEscape(taskMessage));
-  } else {
-    const artifactName = `bridge-context/${taskReq.agent}-${index + 1}-${Date.now()}.md`;
-    const artifactPath = writeTaskArtifact(ctx, artifactName, taskMessage);
-    parts.push(`@${artifactPath}`);
+    if (effectiveTools) {
+      const BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+      const builtins = effectiveTools
+        .split(",")
+        .map((tool) => tool.trim())
+        .filter((tool) => BUILTIN_TOOLS.has(tool));
+      if (builtins.length > 0) {
+        parts.push("--tools", shellEscape(builtins.join(",")));
+      }
+    }
+
+    if (effectiveSkills) {
+      for (const skill of effectiveSkills.split(",").map((s) => s.trim()).filter(Boolean)) {
+        parts.push(shellEscape(`/skill:${skill}`));
+      }
+    }
+
+    const envParts: string[] = [];
+    if (process.env.PI_CODING_AGENT_DIR) {
+      envParts.push(`PI_CODING_AGENT_DIR=${shellEscape(process.env.PI_CODING_AGENT_DIR)}`);
+    }
+    if (process.env.PI_SUBAGENT_RUNTIME_ROOT) {
+      envParts.push(`PI_SUBAGENT_RUNTIME_ROOT=${shellEscape(process.env.PI_SUBAGENT_RUNTIME_ROOT)}`);
+    }
+    if (deniedTools.length > 0) {
+      envParts.push(`PI_DENY_TOOLS=${shellEscape(deniedTools.join(","))}`);
+    }
+    envParts.push(`PI_SUBAGENT_NAME=${shellEscape(taskReq.agent)}`);
+    envParts.push(`PI_SUBAGENT_AGENT=${shellEscape(taskReq.agent)}`);
+    if (agentDefs.autoExit) envParts.push("PI_SUBAGENT_AUTO_EXIT=1");
+
+    if (request.context === "fork") {
+      parts.push(shellEscape(taskMessage));
+    } else {
+      const artifactName = `bridge-context/${taskReq.agent}-${index + 1}-${Date.now()}.md`;
+      taskArtifactPath = writeTaskArtifact(ctx, artifactName, taskMessage);
+      parts.push(shellEscape(`@${taskArtifactPath}`));
+    }
+
+    const rawCwd = request.cwd || agentDefs.cwd || ctx.cwd;
+    const cwdIsFromAgent = !request.cwd && agentDefs.cwd != null;
+    const cwdBase = cwdIsFromAgent ? getAgentConfigDir() : ctx.cwd;
+    const effectiveCwd = rawCwd.startsWith("/") ? rawCwd : join(cwdBase, rawCwd);
+    const envPrefix = envParts.length > 0 ? `${envParts.join(" ")} ` : "";
+    const cdPrefix = effectiveCwd ? `cd ${shellEscape(effectiveCwd)} && ` : "";
+    throwIfAborted(abortController);
+    const command = `${cdPrefix}${envPrefix}${parts.join(" ")}; echo '__SUBAGENT_DONE_'${exitStatusVar()}'__'`;
+    sendCommand(surface, command);
+
+    return {
+      index,
+      agent: taskReq.agent,
+      model: effectiveModel,
+      surface,
+      sessionFile: subagentSessionFile,
+      baselineEntryCount,
+      startTime: Date.now(),
+      abortController,
+      forkCleanupFile,
+    };
+  } catch (error) {
+    if (surface) {
+      try {
+        closeSurface(surface);
+      } catch {}
+    }
+    if (forkCleanupFile) {
+      try {
+        unlinkSync(forkCleanupFile);
+      } catch {}
+    }
+    if (taskArtifactPath) {
+      try {
+        unlinkSync(taskArtifactPath);
+      } catch {}
+    }
+    throw error;
   }
-
-  const rawCwd = request.cwd || agentDefs.cwd || ctx.cwd;
-  const cwdIsFromAgent = !request.cwd && agentDefs.cwd != null;
-  const cwdBase = cwdIsFromAgent ? getAgentConfigDir() : ctx.cwd;
-  const effectiveCwd = rawCwd.startsWith("/") ? rawCwd : join(cwdBase, rawCwd);
-  const envPrefix = envParts.length > 0 ? `${envParts.join(" ")} ` : "";
-  const cdPrefix = effectiveCwd ? `cd ${shellEscape(effectiveCwd)} && ` : "";
-  const command = `${cdPrefix}${envPrefix}${parts.join(" ")}; echo '__SUBAGENT_DONE_'${exitStatusVar()}'__'`;
-  sendCommand(surface, command);
-
-  return {
-    requestId: request.requestId,
-    index,
-    agent: taskReq.agent,
-    task: taskReq.task,
-    model: effectiveModel,
-    context: request.context,
-    cwd: request.cwd,
-    surface,
-    sessionFile: subagentSessionFile,
-    baselineEntryCount,
-    startTime: Date.now(),
-    abortController: new AbortController(),
-    forkCleanupFile,
-  };
 }
 
 function snapshotTask(task: RunningTask): TaskProgressSnapshot {
@@ -601,7 +625,7 @@ function cleanupTask(task: RunningTask) {
   }
 }
 
-async function watchTask(pi: ExtensionAPI, task: RunningTask, onProgress?: (snapshot: TaskProgressSnapshot) => void): Promise<TaskResult> {
+async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgressSnapshot) => void): Promise<TaskResult> {
   try {
     const exitCode = await pollForExit(task.surface, task.abortController.signal, {
       interval: 1000,
@@ -642,112 +666,132 @@ async function watchTask(pi: ExtensionAPI, task: RunningTask, onProgress?: (snap
 }
 
 async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagentRequest, ctx: ExtensionContext) {
-  const task = await launchTask(
-    {
-      agent: request.agent,
-      task: request.task,
-      model: request.model,
-      skill: request.skill,
-      thinking: request.thinking,
-    },
-    request,
-    ctx,
-    0,
-  );
-  runningRequests.set(request.requestId, { controllers: [task.abortController] });
+  const abortController = new AbortController();
+  runningRequests.set(request.requestId, { controllers: [abortController] });
+  try {
+    const task = await launchTask(
+      {
+        agent: request.agent,
+        task: request.task,
+        model: request.model,
+        skill: request.skill,
+        thinking: request.thinking,
+      },
+      request,
+      ctx,
+      0,
+      abortController,
+    );
 
-  const result = await watchTask(pi, task, (progress) => {
-    emitUpdate(pi, {
-      requestId: request.requestId,
-      currentTool: progress.currentTool,
-      currentToolArgs: progress.currentToolArgs,
-      recentOutput: progress.recentOutput,
-      recentOutputLines: progress.recentOutputLines,
-      recentTools: progress.recentTools,
-      model: progress.model,
-      toolCount: progress.toolCount,
-      durationMs: progress.durationMs,
-      tokens: progress.tokens,
+    const result = await watchTask(task, (progress) => {
+      emitUpdate(pi, {
+        requestId: request.requestId,
+        currentTool: progress.currentTool,
+        currentToolArgs: progress.currentToolArgs,
+        recentOutput: progress.recentOutput,
+        recentOutputLines: progress.recentOutputLines,
+        recentTools: progress.recentTools,
+        model: progress.model,
+        toolCount: progress.toolCount,
+        durationMs: progress.durationMs,
+        tokens: progress.tokens,
+      });
     });
-  });
 
-  runningRequests.delete(request.requestId);
-
-  const response: DelegatedSubagentResponse = {
-    requestId: request.requestId,
-    agent: request.agent,
-    task: request.task,
-    context: request.context,
-    model: request.model,
-    cwd: request.cwd,
-    messages: result.messages,
-    isError: result.isError,
-    errorText: result.errorText,
-  };
-  pi.events.emit(RESPONSE_EVENT, response);
+    const response: DelegatedSubagentResponse = {
+      requestId: request.requestId,
+      context: request.context,
+      model: request.model,
+      messages: result.messages,
+      isError: result.isError,
+      errorText: result.errorText,
+    };
+    pi.events.emit(RESPONSE_EVENT, response);
+  } finally {
+    runningRequests.delete(request.requestId);
+  }
 }
 
 async function processParallelRequest(pi: ExtensionAPI, request: DelegatedSubagentRequest, ctx: ExtensionContext) {
   const tasks = request.tasks ?? [];
-  const launched = await Promise.all(tasks.map((task, index) => launchTask(task, request, ctx, index)));
-  runningRequests.set(request.requestId, { controllers: launched.map((task) => task.abortController) });
+  const controllers = tasks.map(() => new AbortController());
+  runningRequests.set(request.requestId, { controllers });
+  try {
+    const launchResults = await Promise.allSettled(
+      tasks.map((task, index) => launchTask(task, request, ctx, index, controllers[index]!)),
+    );
+    const launched = launchResults
+      .filter((result): result is PromiseFulfilledResult<RunningTask> => result.status === "fulfilled")
+      .map((result) => result.value);
+    const launchFailure = launchResults.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (launchFailure) {
+      for (const controller of controllers) {
+        controller.abort();
+      }
+      for (const task of launched) {
+        cleanupTask(task);
+      }
+      throw launchFailure.reason;
+    }
+    const progress = new Map<number, TaskProgressSnapshot>();
+    const emitParallelProgress = () => {
+      emitUpdate(pi, {
+        requestId: request.requestId,
+        taskProgress: launched.map((task) => {
+          const snapshot = progress.get(task.index) ?? snapshotTask(task);
+          return {
+            index: task.index,
+            agent: task.agent,
+            status: snapshot.status,
+            currentTool: snapshot.currentTool,
+            currentToolArgs: snapshot.currentToolArgs,
+            recentOutput: snapshot.recentOutput,
+            recentOutputLines: snapshot.recentOutputLines,
+            recentTools: snapshot.recentTools,
+            model: snapshot.model,
+            toolCount: snapshot.toolCount,
+            durationMs: snapshot.durationMs,
+            tokens: snapshot.tokens,
+          };
+        }),
+      });
+    };
 
-  const progress = new Map<number, TaskProgressSnapshot>();
-  const emitParallelProgress = () => {
-    emitUpdate(pi, {
+    emitParallelProgress();
+
+    const results = await Promise.all(
+      launched.map((task) =>
+        watchTask(task, (snapshot) => {
+          progress.set(task.index, snapshot);
+          emitParallelProgress();
+        }).then((result) => {
+          progress.set(task.index, {
+            ...(progress.get(task.index) ?? snapshotTask(task)),
+            status: result.isError ? "failed" : "completed",
+          });
+          emitParallelProgress();
+          return result;
+        }),
+      ),
+    );
+
+    const failures = results.filter((result) => result.isError);
+    const response: DelegatedSubagentResponse = {
       requestId: request.requestId,
-      taskProgress: launched.map((task) => {
-        const snapshot = progress.get(task.index) ?? snapshotTask(task);
-        return {
-          index: task.index,
-          agent: task.agent,
-          status: snapshot.status,
-          currentTool: snapshot.currentTool,
-          currentToolArgs: snapshot.currentToolArgs,
-          recentOutput: snapshot.recentOutput,
-          recentOutputLines: snapshot.recentOutputLines,
-          recentTools: snapshot.recentTools,
-          model: snapshot.model,
-          toolCount: snapshot.toolCount,
-          durationMs: snapshot.durationMs,
-          tokens: snapshot.tokens,
-        };
-      }),
-    });
-  };
-
-  emitParallelProgress();
-
-  const results = await Promise.all(
-    launched.map((task) =>
-      watchTask(pi, task, (snapshot) => {
-        progress.set(task.index, snapshot);
-        emitParallelProgress();
-      }).then((result) => {
-        progress.set(task.index, {
-          ...(progress.get(task.index) ?? snapshotTask(task)),
-          status: result.isError ? "failed" : "completed",
-        });
-        emitParallelProgress();
-        return result;
-      }),
-    ),
-  );
-
-  runningRequests.delete(request.requestId);
-
-  const response: DelegatedSubagentResponse = {
-    requestId: request.requestId,
-    agent: request.agent,
-    task: request.task,
-    context: request.context,
-    model: request.model,
-    cwd: request.cwd,
-    messages: [],
-    parallelResults: results,
-    isError: false,
-  };
-  pi.events.emit(RESPONSE_EVENT, response);
+      context: request.context,
+      model: request.model,
+      messages: [],
+      parallelResults: results,
+      isError: failures.length > 0,
+      errorText:
+        failures.length > 0
+          ? failures.map((failure) => `${failure.agent}: ${failure.errorText || "unknown delegated error"}`).join("; ")
+          : undefined,
+    };
+    pi.events.emit(RESPONSE_EVENT, response);
+  } finally {
+    runningRequests.delete(request.requestId);
+  }
 }
 
 export default function promptTemplateInteractiveSubagentBridge(pi: ExtensionAPI) {
@@ -755,7 +799,12 @@ export default function promptTemplateInteractiveSubagentBridge(pi: ExtensionAPI
     latestCtx = ctx;
   });
 
+  pi.on("session_switch", (_event, ctx) => {
+    latestCtx = ctx;
+  });
+
   pi.on("session_shutdown", () => {
+    latestCtx = null;
     for (const { controllers } of runningRequests.values()) {
       for (const controller of controllers) controller.abort();
     }
@@ -778,7 +827,9 @@ export default function promptTemplateInteractiveSubagentBridge(pi: ExtensionAPI
     if (!ctx) {
       queueMicrotask(() => {
         pi.events.emit(RESPONSE_EVENT, {
-          ...request,
+          requestId: request.requestId,
+          context: request.context,
+          model: request.model,
           messages: [],
           isError: true,
           errorText: "Subagent bridge has no active session context.",
@@ -796,7 +847,9 @@ export default function promptTemplateInteractiveSubagentBridge(pi: ExtensionAPI
         }
       } catch (error) {
         pi.events.emit(RESPONSE_EVENT, {
-          ...request,
+          requestId: request.requestId,
+          context: request.context,
+          model: request.model,
           messages: [],
           isError: true,
           errorText: error instanceof Error ? error.message : String(error),

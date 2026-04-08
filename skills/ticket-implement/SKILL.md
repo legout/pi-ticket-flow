@@ -13,36 +13,49 @@ You are **not** responsible for validation in this step. The full validation/fix
 
 ## Required procedure
 
-1. Read `ticket-flow/current.md` using `read_artifact`.
+1. Read `ticket-flow/invocation.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
+   - `status:`
+   - `mode:`
+   - `ticket:`
+   - `run_token:`
+   - `reason:`
+3. If parsing fails, stop and report that this ticket-flow invocation is not armed for implementation.
+4. If `status` is not `armed`, stop and report that implementation is not armed for this invocation.
+5. Read `ticket-flow/current.md` using `read_artifact`.
+6. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
    - `ticket_path:`
    - `stage:`
    - `implementation_artifact:`
    - `validation_artifact:`
    - `review_artifact:`
-3. If parsing fails, stop and tell the user to run `/ticket-reset`.
-4. Extract:
+   - optional tombstone line: `reason:`
+7. If parsing fails, stop and tell the user to run `/ticket-reset`.
+8. Extract:
    - `ticket`
    - `ticket_path`
    - `stage`
    - `implementation_artifact`
    - `validation_artifact`
-5. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for implementation.
-6. If `stage` is not `waiting-worker`, stop and report that implementation can only run from the `waiting-worker` stage.
-7. Read the ticket file.
-8. Run `tk notes <ticket>`.
-9. Gather all relevant repo context before editing.
-10. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while implementing.
-11. Implement exactly this ticket.
-12. Do **not** run the repo's validation commands in this step. Leave tests, lint, typecheck, build, and fix-to-green work entirely to `ticket-test-fix`.
-13. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
-14. If blocked, write `status: blocked` clearly in the artifact.
-15. Otherwise write `status: ready-for-validation`.
-16. Do **not** overwrite `ticket-flow/current.md`; the main-session orchestrator owns state transitions.
-17. Do not call `tk add-note`.
-18. Do not call `tk close`.
-19. End with a short summary naming the ticket id and artifact path.
+   - `review_artifact`
+9. If the invocation `ticket` does not match the selected `ticket`, stop and report that the invocation guard does not match the selected ticket.
+10. If any of `implementation_artifact`, `validation_artifact`, or `review_artifact` does not contain the invocation `run_token`, stop and report that the invocation guard does not match the selected attempt.
+11. If `ticket` is `none` or `reset`, or `ticket_path` is `none`, stop and report that no ticket is selected for implementation.
+12. If `stage` is not `waiting-worker`, stop and report that implementation can only run from the `waiting-worker` stage.
+13. Read the ticket file.
+14. Run `tk notes <ticket>`.
+15. Gather all relevant repo context before editing.
+16. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while implementing.
+17. Implement exactly this ticket.
+18. Do **not** run the repo's validation commands in this step. Leave tests, lint, typecheck, build, and fix-to-green work entirely to `ticket-test-fix`.
+19. Write the implementation artifact to the exact path from `ticket-flow/current.md`.
+20. If blocked, write `status: blocked` clearly in the artifact.
+21. Otherwise write `status: ready-for-validation`.
+22. Do **not** overwrite `ticket-flow/current.md`; the main-session orchestrator owns state transitions.
+23. Do not call `tk add-note`.
+24. Do not call `tk close`.
+25. End with a short summary naming the ticket id and artifact path.
 
 ## Artifact contract
 

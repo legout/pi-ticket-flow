@@ -212,7 +212,7 @@ Workflow skills:
 `/ticket-flow` processes **exactly one ticket per invocation**.
 
 High-level flow:
-1. pick or resume a ticket
+1. pick a ticket
 2. delegate implementation to a fresh worker
 3. delegate validation/fix-to-green to a fresh worker
 4. delegate review to a fresh reviewer
@@ -247,6 +247,7 @@ Recommended workflow guidance files:
 ### Session artifacts (ephemeral)
 
 Artifacts used by the workflow:
+- `ticket-flow/invocation.md`
 - `ticket-flow/current.md`
 - `ticket-flow/<ticket-id>/implementation-<run-token>.md`
 - `ticket-flow/<ticket-id>/validation-<run-token>.md`

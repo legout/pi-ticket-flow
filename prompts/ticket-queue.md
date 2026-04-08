@@ -1,6 +1,6 @@
 ---
 description: Process ready tickets sequentially until the queue is empty (default) or a loop cap is reached
-chain: ticket-pick -> ticket-implement -> ticket-test-fix -> ticket-mark-review -> ticket-review -> ticket-finalize
+chain: ticket-pick queue -> ticket-implement -> ticket-mark-validation -> ticket-test-fix -> ticket-mark-review -> ticket-review -> ticket-finalize
 chainContext: summary
 restore: true
 loop: unlimited
@@ -16,6 +16,7 @@ Optional behavior:
 - pass `--loop N` to cap how many tickets are processed in this invocation
 
 Queue tracking artifacts:
+- `ticket-flow/invocation.md`
 - `ticket-flow/current.md`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`

@@ -1,4 +1,3 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   copyFileSync,
   existsSync,
@@ -84,7 +83,7 @@ function syncPackageAgents(): void {
   }
 }
 
-export default function registerTicketAgents(_pi: ExtensionAPI) {
+export default function registerTicketAgents() {
   process.env.PI_SUBAGENT_RUNTIME_ROOT ??= runtimeRoot();
   syncPackageAgents();
 }

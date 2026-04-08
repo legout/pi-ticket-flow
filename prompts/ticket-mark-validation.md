@@ -1,10 +1,10 @@
 ---
-description: Advance ticket-flow/current.md from waiting-validation to waiting-review after validation is green
+description: Advance ticket-flow/current.md from waiting-worker to waiting-validation after implementation is ready for validation
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 restore: true
 ---
-Prepare the selected ticket for review.
+Prepare the selected ticket for validation.
 
 Procedure:
 1. Read `ticket-flow/invocation.md` using `read_artifact`.
@@ -15,7 +15,7 @@ Procedure:
    - `run_token:`
    - `reason:`
 3. If parsing fails, stop and report that this ticket-flow invocation is not armed for downstream steps.
-4. If `status` is not `armed`, stop and report that review preparation is not armed for this invocation.
+4. If `status` is not `armed`, stop and report that validation preparation is not armed for this invocation.
 5. Read `ticket-flow/current.md` using `read_artifact`.
 6. Parse it using exact single-occurrence line prefixes:
    - `ticket:`
@@ -29,12 +29,12 @@ Procedure:
 8. Extract the current `ticket`, `ticket_path`, `stage`, `implementation_artifact`, `validation_artifact`, and `review_artifact`.
 9. If the invocation `ticket` does not match the current `ticket`, stop and report that the invocation guard does not match the selected ticket.
 10. If any of `implementation_artifact`, `validation_artifact`, or `review_artifact` does not contain the invocation `run_token`, stop and report that the invocation guard does not match the selected attempt.
-11. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for review preparation.
-12. If `stage` is not `waiting-validation`, stop and report that review preparation can only run from the `waiting-validation` stage.
-13. Read the validation artifact referenced there.
-14. If the validation artifact is missing, stop and report that review cannot proceed.
-15. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because implementation/validation is blocked.
-16. If the validation artifact does not indicate `status: ready-for-review`, stop and report that review cannot proceed because validation is not complete yet.
+11. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for validation preparation.
+12. If `stage` is not `waiting-worker`, stop and report that validation preparation can only run from the `waiting-worker` stage.
+13. Read the implementation artifact referenced there.
+14. If the implementation artifact is missing, stop and report that validation cannot proceed because implementation has not completed.
+15. If the implementation artifact indicates `status: blocked`, stop and report that implementation is blocked; leave `ticket-flow/current.md` unchanged so finalization can escalate directly from the implementation artifact.
+16. If the implementation artifact does not contain `status: ready-for-validation`, stop and report that the implementation artifact is not in a validation-ready state yet.
 17. Overwrite `ticket-flow/current.md` with the same values, but set:
-   - `stage: waiting-review`
-18. End with a short summary including the ticket id.
+   - `stage: waiting-validation`
+18. End with a short summary including the ticket id and implementation status.

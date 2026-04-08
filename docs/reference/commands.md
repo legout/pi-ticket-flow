@@ -51,6 +51,7 @@ These exist in `prompts/` and are usually called by chain workflows rather than 
 
 - `ticket-pick`
 - `ticket-implement`
+- `ticket-mark-validation`
 - `ticket-test-fix`
 - `ticket-mark-review`
 - `ticket-review`

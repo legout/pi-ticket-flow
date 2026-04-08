@@ -9,7 +9,7 @@ export interface SelectedModelCandidate {
 	alreadyActive: boolean;
 }
 
-type RegistryLike = Pick<ModelRegistry, "find" | "getAll" | "getAvailable" | "getApiKey" | "isUsingOAuth">;
+export type RegistryLike = Pick<ModelRegistry, "find" | "getAll" | "getAvailable" | "getApiKeyForProvider" | "isUsingOAuth">;
 
 function isSameModel(a: Model<any>, b: Model<any>): boolean {
 	return a.provider === b.provider && a.id === b.id;
@@ -71,7 +71,7 @@ async function hasUsableAuth(model: Model<any>, registry: RegistryLike): Promise
 	const availableMatch = registry.getAvailable().some((candidate) => isSameModel(candidate, model));
 	if (availableMatch) return true;
 	if (!registry.isUsingOAuth(model)) return false;
-	return Boolean(await registry.getApiKey(model));
+	return Boolean(await registry.getApiKeyForProvider(model.provider));
 }
 
 export async function selectModelCandidate(

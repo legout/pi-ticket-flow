@@ -46,12 +46,15 @@ Run:
 /ticket-reset
 ```
 
-This writes a tombstone state so the next run can start cleanly.
+This writes a tombstone `ticket-flow/current.md` state and blocks `ticket-flow/invocation.md` so the next run can start cleanly.
+
+If `/ticket-queue` stops immediately because it found unfinished or malformed orchestrator state, that is intentional — fix the stale state with `/ticket-reset` before retrying the queue.
 
 ## Validation or review does not advance
 
 Inspect:
 
+- `ticket-flow/invocation.md`
 - `ticket-flow/current.md`
 - the referenced implementation, validation, and review artifacts
 
@@ -59,6 +62,7 @@ Common causes:
 
 - implementation artifact is `blocked`
 - validation artifact is missing or not `ready-for-review`
+- the invocation guard is still `blocked`
 - `current.md` stage does not match the artifact state
 
 ## Queue finishes immediately

@@ -92,6 +92,7 @@ The workflow is:
 
 Useful files while the workflow runs:
 
+- `ticket-flow/invocation.md`
 - `ticket-flow/current.md`
 - `ticket-flow/<ticket-id>/implementation-<run-token>.md`
 - `ticket-flow/<ticket-id>/validation-<run-token>.md`

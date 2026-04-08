@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import type { AssistantMessage, Message } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionContext, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { Model } from "@mariozechner/pi-ai";
 import { Key, matchesKey } from "@mariozechner/pi-tui";
 import { preparePromptExecution } from "./prompt-execution.js";
+import type { RegistryLike } from "./model-selection.js";
 import type { PromptWithModel } from "./prompt-loader.js";
 import { notify } from "./notifications.js";
 import {
@@ -63,7 +64,6 @@ type DelegatedPromptOptions = DelegatedSinglePromptOptions | DelegatedParallelPr
 export interface DelegatedPromptOutcome {
 	changed: boolean;
 	text: string;
-	agent: string;
 }
 
 function extractTextFromBlocks(content: AssistantMessage["content"]): string {
@@ -172,7 +172,7 @@ async function prepareDelegatedTask(
 		task.prompt,
 		task.args,
 		currentModel,
-		ctx.modelRegistry as Pick<ModelRegistry, "find" | "getAll" | "getAvailable" | "getApiKey" | "isUsingOAuth">,
+		ctx.modelRegistry as RegistryLike,
 		preparationOptions,
 	);
 	if (!prepared) {
@@ -229,7 +229,7 @@ function hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
 
 function sanitizeOutputLines(lines: string[] | undefined): string[] {
 	if (!lines || lines.length === 0) return [];
-	return lines.filter((line): line is string => typeof line === "string" && line.trim() && line.trim() !== "(running...)");
+	return lines.filter((line): line is string => typeof line === "string" && line.trim().length > 0 && line.trim() !== "(running...)");
 }
 
 function collectNewOutputLines(previous: string[] | undefined, next: string[] | undefined): string[] {
@@ -374,7 +374,7 @@ async function requestDelegatedRun(
 			widgetSet = true;
 			ctx.ui.setWidget(
 				DELEGATED_WIDGET_KEY,
-				(_tui, theme) => createDelegatedProgressWidget(request.requestId, request.agent, request.context, request.task, request.tasks, theme, request.model),
+				() => createDelegatedProgressWidget(request.requestId, request.agent, request.tasks),
 				{ placement: "aboveEditor" },
 			);
 			// Force TUI repaints every second so the elapsed timer ticks during idle periods
@@ -531,8 +531,8 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 	const runtime = await ensureSubagentRuntime(ctx.cwd);
 	const isParallelRequest = "parallel" in options;
 
-	const tasks = isParallelRequest
-		? options.parallel
+	const tasks: DelegatedParallelTaskInput[] = isParallelRequest
+		? (options.parallel ?? [])
 		: [{ prompt: options.prompt, args: options.args }];
 	if (tasks.length === 0) return undefined;
 
@@ -631,7 +631,6 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 			return {
 				changed: parallelResults.some((result) => delegatedMessagesChanged(result.messages)),
 				text,
-				agent: request.agent,
 			};
 		}
 
@@ -660,7 +659,6 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 		return {
 			changed: delegatedMessagesChanged(messages),
 			text,
-			agent: preparedTasks[0]!.agent,
 		};
 	} catch (error) {
 		const cause = error instanceof Error ? error : new Error(String(error));
