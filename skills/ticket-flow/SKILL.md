@@ -111,8 +111,7 @@ When there is no unfinished orchestrator state:
    - prefer listed tickets already marked `[in_progress]`
    - then consider other ready tickets
 4. For each candidate, inspect its notes and skip it if they already contain `Gate: ESCALATE`
-   - prefer `tk notes <ticket-id>` when that command exists in this repo's `tk` version
-   - if `tk notes` is unavailable, use `tk show <ticket-id>` and inspect the Notes section
+   - this repo's `tk` does not provide `tk notes`; use `tk show <ticket-id>` and inspect the Notes section
 5. Pick the **first eligible** candidate
 6. If no eligible candidate remains, stop and report that all ready tickets are escalated or ineligible
 7. If the chosen ticket is not already `in_progress`, run:
@@ -127,7 +126,7 @@ Spawn a fresh subagent using the base `worker` agent with the `ticket-implement`
 
 Requirements for the worker task:
 - read `.tickets/<ticket-id>.md`
-- inspect the ticket notes (`tk notes <ticket-id>` when available; otherwise `tk show <ticket-id>` and read the Notes section)
+- inspect the ticket notes with `tk show <ticket-id>` and read the Notes section
 - gather all relevant code context before editing
 - implement only this ticket
 - do not run the repo validation loop in this step
@@ -198,8 +197,7 @@ Procedure:
 5. Otherwise read the exact `review_artifact` path from `ticket-flow/current.md`
 6. Parse `gate: PASS` or `gate: REVISE`
 7. Inspect existing ticket notes and count failed review cycles by counting prior notes containing `Gate: REVISE`
-   - prefer `tk notes <ticket-id>` when that command exists in this repo's `tk` version
-   - if `tk notes` is unavailable, use `tk show <ticket-id>` and inspect the Notes section
+   - use `tk show <ticket-id>` and inspect the Notes section
 8. Add a ticket note with `tk add-note <ticket-id> ...`
 9. If PASS, also run `tk close <ticket-id>`
 10. If REVISE and this would be failed review **1 or 2**, add a revise note and leave the ticket `in_progress`

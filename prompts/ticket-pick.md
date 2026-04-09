@@ -107,9 +107,7 @@ reason: selection not completed
 12. Inspect candidates in listed order:
    - prefer tickets already marked `[in_progress]`
    - then consider the remaining ready tickets
-13. For each candidate, inspect its notes.
-   - Prefer `tk notes <ticket-id>` when that command exists in this repo's `tk` version.
-   - If `tk notes` is unavailable, use `tk show <ticket-id>` and inspect the Notes section.
+13. For each candidate, inspect its notes with `tk show <ticket-id>` and inspect the Notes section.
    - If the notes contain `Gate: ESCALATE`, skip that ticket.
 14. Pick the first eligible ticket.
 15. If no eligible ticket remains:
