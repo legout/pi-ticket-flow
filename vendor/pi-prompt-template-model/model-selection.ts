@@ -9,6 +9,10 @@ export interface SelectedModelCandidate {
 	alreadyActive: boolean;
 }
 
+export interface ModelSelectionOptions {
+	excludedModels?: Set<string>;
+}
+
 export type RegistryLike = Pick<ModelRegistry, "find" | "getAll" | "getAvailable" | "getApiKeyForProvider" | "isUsingOAuth">;
 
 function isSameModel(a: Model<any>, b: Model<any>): boolean {
@@ -26,13 +30,17 @@ function modelSpecMatches(modelSpec: string, model: Model<any>): boolean {
 	return modelSpec === model.id;
 }
 
+export function getModelKey(model: Pick<Model<any>, "provider" | "id">): string {
+	return `${model.provider}/${model.id}`;
+}
+
 function orderMatchesByProviderPreference(models: Model<any>[]): Model<any>[] {
 	const prioritized: Model<any>[] = [];
 	const seen = new Set<string>();
 
 	for (const provider of PREFERRED_PROVIDERS) {
 		for (const model of models) {
-			const key = `${model.provider}/${model.id}`;
+			const key = getModelKey(model);
 			if (model.provider === provider && !seen.has(key)) {
 				prioritized.push(model);
 				seen.add(key);
@@ -41,7 +49,7 @@ function orderMatchesByProviderPreference(models: Model<any>[]): Model<any>[] {
 	}
 
 	for (const model of models) {
-		const key = `${model.provider}/${model.id}`;
+		const key = getModelKey(model);
 		if (!seen.has(key)) {
 			prioritized.push(model);
 			seen.add(key);
@@ -74,24 +82,45 @@ async function hasUsableAuth(model: Model<any>, registry: RegistryLike): Promise
 	return Boolean(await registry.getApiKeyForProvider(model.provider));
 }
 
-export async function selectModelCandidate(
+export async function listModelCandidates(
 	modelSpecs: string[],
 	currentModel: Model<any> | undefined,
 	registry: RegistryLike,
-): Promise<SelectedModelCandidate | undefined> {
+	options?: ModelSelectionOptions,
+): Promise<SelectedModelCandidate[]> {
+	const excludedModels = options?.excludedModels ?? new Set<string>();
+	const selected: SelectedModelCandidate[] = [];
+	const seen = new Set<string>();
+
+	const maybeAddModel = async (model: Model<any>, alreadyActive: boolean) => {
+		const key = getModelKey(model);
+		if (seen.has(key) || excludedModels.has(key)) return;
+		if (!(await hasUsableAuth(model, registry))) return;
+		seen.add(key);
+		selected.push({ model, alreadyActive });
+	};
+
 	if (currentModel && modelSpecs.some((spec) => modelSpecMatches(spec, currentModel))) {
-		return { model: currentModel, alreadyActive: true };
+		await maybeAddModel(currentModel, true);
 	}
 
 	for (const spec of modelSpecs) {
 		for (const model of getModelCandidates(spec, registry)) {
-			if (await hasUsableAuth(model, registry)) {
-				return { model, alreadyActive: false };
-			}
+			await maybeAddModel(model, currentModel ? isSameModel(model, currentModel) : false);
 		}
 	}
 
-	return undefined;
+	return selected;
+}
+
+export async function selectModelCandidate(
+	modelSpecs: string[],
+	currentModel: Model<any> | undefined,
+	registry: RegistryLike,
+	options?: ModelSelectionOptions,
+): Promise<SelectedModelCandidate | undefined> {
+	const candidates = await listModelCandidates(modelSpecs, currentModel, registry, options);
+	return candidates[0];
 }
 
 export function getResolvedModelRef(model: Model<any>): ResolvedModelRef {

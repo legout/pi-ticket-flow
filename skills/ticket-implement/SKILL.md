@@ -121,6 +121,12 @@ For the implementation step, prefer leaving validation explicitly deferred to `t
 
 If blocked, replace `Remaining Issues` with clear blockers and the exact failing command/output.
 
+Invalid artifact examples — do **not** use these:
+- `**Ticket:** ...`
+- `**Status:** Completed`
+- any artifact that omits the exact lowercase `ticket:` and `status:` lines
+- any delegated implementation step that writes `ticket-flow/current.md`
+
 ## Rules
 
 - Work on one ticket only

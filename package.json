@@ -24,6 +24,8 @@
   "type": "module",
   "scripts": {
     "smoke:delegated-outcome": "node --experimental-strip-types scripts/smoke-delegated-subagent-outcome.ts",
+    "smoke:delegated-retry": "node --experimental-strip-types scripts/smoke-delegated-retry.ts",
+    "smoke:model-selection": "node --experimental-strip-types scripts/smoke-model-selection.ts",
     "smoke:bridge-message": "node --experimental-strip-types scripts/smoke-bridge-message-utils.ts"
   },
   "files": [

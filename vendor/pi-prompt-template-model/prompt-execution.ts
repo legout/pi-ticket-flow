@@ -1,6 +1,11 @@
 import type { Model } from "@mariozechner/pi-ai";
 import { substituteArgs } from "./args.js";
-import { getResolvedModelRef, selectModelCandidate, type RegistryLike, type SelectedModelCandidate } from "./model-selection.js";
+import {
+	getResolvedModelRef,
+	selectModelCandidate,
+	type RegistryLike,
+	type SelectedModelCandidate,
+} from "./model-selection.js";
 import type { PromptWithModel } from "./prompt-loader.js";
 import { renderTemplateConditionals } from "./template-conditionals.js";
 
@@ -17,6 +22,8 @@ export interface EmptyPromptAbort {
 
 interface PromptExecutionOptions {
 	inheritedModel?: Model<any>;
+	selectedModel?: SelectedModelCandidate;
+	excludedModels?: Set<string>;
 }
 
 export interface RenderedPrompt {
@@ -57,7 +64,8 @@ export async function preparePromptExecution(
 	options?: PromptExecutionOptions,
 ): Promise<PreparedPromptExecution | EmptyPromptAbort | undefined> {
 	const selectedModel =
-		prompt.models.length === 0
+		options?.selectedModel ??
+		(prompt.models.length === 0
 			? (() => {
 				const hasInheritedModel = options !== undefined && Object.hasOwn(options, "inheritedModel");
 				const inheritedModel = hasInheritedModel ? options.inheritedModel : currentModel;
@@ -71,7 +79,9 @@ export async function preparePromptExecution(
 					alreadyActive: sameModel(currentModel, inheritedModel),
 				};
 			})()
-			: await selectModelCandidate(prompt.models, currentModel, modelRegistry);
+			: await selectModelCandidate(prompt.models, currentModel, modelRegistry, {
+				excludedModels: options?.excludedModels,
+			}));
 	if (!selectedModel) return undefined;
 	if ("message" in selectedModel) return selectedModel;
 

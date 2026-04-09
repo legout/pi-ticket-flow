@@ -52,6 +52,8 @@ If `/ticket-queue` stops immediately because it found unfinished or malformed or
 
 ## Validation or review does not advance
 
+Transient delegated-provider overloads (`429`, `temporarily overloaded`, rate-limit style errors) are retried automatically with backoff. If the delegated prompt lists multiple models, retries can fall back to the next configured model.
+
 Inspect:
 
 - `ticket-flow/invocation.md`

@@ -1,6 +1,6 @@
 ---
 description: Advance ticket-flow/current.md from waiting-worker to waiting-validation after implementation is ready for validation
-model: zai/glm-5-turbo, minimax/MiniMax-M2.7
+model: openai-codex/gpt-5.4-mini, zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 restore: true
 ---
@@ -9,6 +9,11 @@ Prepare the selected ticket for validation.
 If any prerequisite check fails and validation preparation cannot advance the workflow, end your response with the exact final line:
 
 `<!-- CHAIN_STOP -->`
+
+Strict parsing rule:
+- Only exact lowercase prefix lines count (`ticket:` and `status:`).
+- Do **not** treat headings, bold labels, or semantically similar text such as `**Ticket:** ...` or `**Status:** Completed` as valid substitutes.
+- If the implementation artifact is malformed, stop; do **not** advance `ticket-flow/current.md`.
 
 Procedure:
 1. Read `ticket-flow/invocation.md` using `read_artifact`.

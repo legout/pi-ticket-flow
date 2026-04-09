@@ -5,7 +5,13 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import type { Model } from "@mariozechner/pi-ai";
 import { Key, matchesKey } from "@mariozechner/pi-tui";
 import { preparePromptExecution } from "./prompt-execution.js";
-import type { RegistryLike } from "./model-selection.js";
+import {
+	getDelegatedRetryCount,
+	getDelegatedRetryDelayMs,
+	isRetryableDelegatedErrorText,
+	waitForDelegatedRetry,
+} from "./delegated-retry.js";
+import { listModelCandidates, type RegistryLike, type SelectedModelCandidate } from "./model-selection.js";
 import type { PromptWithModel } from "./prompt-loader.js";
 import { notify } from "./notifications.js";
 import {
@@ -161,19 +167,23 @@ async function prepareDelegatedTask(
 	inheritedModel: Model<any> | undefined,
 	taskPreamble: string | undefined,
 	runtime: Awaited<ReturnType<typeof ensureSubagentRuntime>>,
+	selectedModel?: SelectedModelCandidate,
 ): Promise<PreparedDelegatedTask> {
 	const requestedAgent = resolveDelegationName(task.prompt, override);
 	if (!requestedAgent) {
 		throw new Error(`Prompt \`${task.prompt.name}\` is not configured for delegated execution.`);
 	}
 	const agent = resolveDelegatedAgent(runtime, ctx.cwd, requestedAgent);
-	const preparationOptions = inheritedModel === undefined ? undefined : { inheritedModel };
+	const preparationOptions = {
+		...(inheritedModel === undefined ? {} : { inheritedModel }),
+		...(selectedModel ? { selectedModel } : {}),
+	};
 	const prepared = await preparePromptExecution(
 		task.prompt,
 		task.args,
 		currentModel,
 		ctx.modelRegistry as RegistryLike,
-		preparationOptions,
+		Object.keys(preparationOptions).length > 0 ? preparationOptions : undefined,
 	);
 	if (!prepared) {
 		throw new Error(`No available model from: ${task.prompt.models.join(", ")}`);
@@ -201,6 +211,33 @@ async function prepareDelegatedTask(
 		cwd: effectiveCwd,
 		...(task.prompt.skill ? { skill: task.prompt.skill } : {}),
 		...(task.prompt.thinking ? { thinking: task.prompt.thinking } : {}),
+	};
+}
+
+function buildDelegatedRequest(
+	preparedTasks: PreparedDelegatedTask[],
+	isParallelRequest: boolean,
+): DelegatedSubagentRequest {
+	return {
+		requestId: randomUUID(),
+		agent: preparedTasks[0]!.agent,
+		task: preparedTasks[0]!.task,
+		...(isParallelRequest
+			? {
+				tasks: preparedTasks.map<DelegatedSubagentTask>((task) => ({
+					agent: task.agent,
+					task: task.task,
+					model: task.model,
+					...(task.skill ? { skill: task.skill } : {}),
+					...(task.thinking ? { thinking: task.thinking } : {}),
+				})),
+			}
+			: {}),
+		context: preparedTasks[0]!.context,
+		model: preparedTasks[0]!.model,
+		cwd: preparedTasks[0]!.cwd,
+		...(!isParallelRequest && preparedTasks[0]!.skill ? { skill: preparedTasks[0]!.skill } : {}),
+		...(!isParallelRequest && preparedTasks[0]!.thinking ? { thinking: preparedTasks[0]!.thinking } : {}),
 	};
 }
 
@@ -535,143 +572,194 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 		? (options.parallel ?? [])
 		: [{ prompt: options.prompt, args: options.args }];
 	if (tasks.length === 0) return undefined;
-
-	const preparedTasks: PreparedDelegatedTask[] = [];
-	for (const task of tasks) {
-		const preparedTask = await prepareDelegatedTask(task, ctx, currentModel, override, inheritedModel, taskPreamble, runtime);
-		preparedTasks.push(preparedTask);
-	}
-
-	const requestContext = preparedTasks[0]!.context;
-	const requestCwd = preparedTasks[0]!.cwd;
-	for (const preparedTask of preparedTasks) {
-		if (preparedTask.context !== requestContext) {
-			throw new Error("Parallel delegated prompts must share the same inheritContext setting.");
-		}
-		if (preparedTask.cwd !== requestCwd) {
-			throw new Error("Parallel delegated prompts must share the same cwd setting.");
-		}
-	}
-
-	const request: DelegatedSubagentRequest = {
-		requestId: randomUUID(),
-		agent: preparedTasks[0]!.agent,
-		task: preparedTasks[0]!.task,
-		...(isParallelRequest
-			? {
-				tasks: preparedTasks.map<DelegatedSubagentTask>((task) => ({
-					agent: task.agent,
-					task: task.task,
-					model: task.model,
-					...(task.skill ? { skill: task.skill } : {}),
-					...(task.thinking ? { thinking: task.thinking } : {}),
-				})),
-			}
-			: {}),
-		context: requestContext,
-		model: preparedTasks[0]!.model,
-		cwd: requestCwd,
-		...(!isParallelRequest && preparedTasks[0]!.skill ? { skill: preparedTasks[0]!.skill } : {}),
-		...(!isParallelRequest && preparedTasks[0]!.thinking ? { thinking: preparedTasks[0]!.thinking } : {}),
-	};
-
-	const promptLabel = preparedTasks.map((task) => task.promptName).join(", ");
-	const statusLabel = isParallelRequest ? `parallel(${preparedTasks.length})` : preparedTasks[0]!.agent;
-	if (ctx.hasUI) {
-		ctx.ui.setStatus("prompt-subagent", `delegating to ${statusLabel}`);
-		ctx.ui.setWorkingMessage(isParallelRequest ? `Running delegated parallel prompts with ${statusLabel}...` : `Running delegated prompt with ${statusLabel}...`);
-	}
-	notify(
-		ctx,
-		isParallelRequest
-			? `Delegating parallel prompts (${promptLabel})`
-			: `Delegating prompt \`${preparedTasks[0]!.promptName}\` to subagent \`${preparedTasks[0]!.agent}\``,
-		"info",
-	);
+	const retryModelCandidates = !isParallelRequest && options.prompt.models.length > 0
+		? await listModelCandidates(options.prompt.models, currentModel, ctx.modelRegistry as RegistryLike)
+		: [];
+	const maxRetries = isParallelRequest ? 0 : getDelegatedRetryCount();
 
 	try {
-		const response = await requestDelegatedRun(pi, ctx, request, signal);
-		if (response.isError) {
-			throw new Error(
-				`Delegated prompt execution failed: ${response.errorText || "unknown delegated error"}`,
-			);
-		}
+		for (let attempt = 0; attempt <= maxRetries; attempt++) {
+			const selectedRetryModel = !isParallelRequest && retryModelCandidates.length > 0
+				? retryModelCandidates[Math.min(attempt, retryModelCandidates.length - 1)]
+				: undefined;
 
-		if (isParallelRequest) {
-			const parallelResults = coerceParallelResults(response.parallelResults);
-			if (parallelResults.length === 0) {
-				throw new Error("Delegated parallel execution returned no results.");
+			const preparedTasks: PreparedDelegatedTask[] = [];
+			for (const task of tasks) {
+				const preparedTask = await prepareDelegatedTask(
+					task,
+					ctx,
+					currentModel,
+					override,
+					inheritedModel,
+					taskPreamble,
+					runtime,
+					!isParallelRequest ? selectedRetryModel : undefined,
+				);
+				preparedTasks.push(preparedTask);
 			}
-			const failures = parallelResults.filter((result) => result.isError);
-			if (failures.length > 0) {
-				const failureText = failures
-					.map((failure) => `${failure.agent}: ${failure.errorText || "unknown delegated error"}`)
-					.join("; ");
-				throw new Error(`Delegated parallel execution failed: ${failureText}`);
+
+			const requestContext = preparedTasks[0]!.context;
+			const requestCwd = preparedTasks[0]!.cwd;
+			for (const preparedTask of preparedTasks) {
+				if (preparedTask.context !== requestContext) {
+					throw new Error("Parallel delegated prompts must share the same inheritContext setting.");
+				}
+				if (preparedTask.cwd !== requestCwd) {
+					throw new Error("Parallel delegated prompts must share the same cwd setting.");
+				}
 			}
 
-			const text = renderParallelDelegatedText(parallelResults);
-			pi.sendMessage({
-				customType: PROMPT_TEMPLATE_SUBAGENT_MESSAGE_TYPE,
-				content: text,
-				display: true,
-				details: {
-					requestId: response.requestId,
-					agent: request.agent,
-					task: preparedTasks.map((task) => task.task).join("\n\n"),
-					context: response.context,
-					model: response.model,
-					messages: [],
-					parallelResults,
-					isError: false,
-					errorText: response.errorText,
-				},
-			});
+			const request = buildDelegatedRequest(preparedTasks, isParallelRequest);
+			const promptLabel = preparedTasks.map((task) => task.promptName).join(", ");
+			const statusLabel = isParallelRequest ? `parallel(${preparedTasks.length})` : preparedTasks[0]!.agent;
+			if (ctx.hasUI) {
+				ctx.ui.setStatus("prompt-subagent", `delegating to ${statusLabel}`);
+				ctx.ui.setWorkingMessage(
+					isParallelRequest
+						? `Running delegated parallel prompts with ${statusLabel}...`
+						: `Running delegated prompt with ${statusLabel}...`,
+				);
+			}
+			if (attempt === 0) {
+				notify(
+					ctx,
+					isParallelRequest
+						? `Delegating parallel prompts (${promptLabel})`
+						: `Delegating prompt \`${preparedTasks[0]!.promptName}\` to subagent \`${preparedTasks[0]!.agent}\``,
+					"info",
+				);
+			}
 
-			return {
-				changed: parallelResults.some((result) => delegatedMessagesChanged(result.messages)),
-				text,
-			};
+			try {
+				const response = await requestDelegatedRun(pi, ctx, request, signal);
+				if (response.isError) {
+					throw new Error(
+						`Delegated prompt execution failed: ${response.errorText || "unknown delegated error"}`,
+					);
+				}
+
+				if (isParallelRequest) {
+					const parallelResults = coerceParallelResults(response.parallelResults);
+					if (parallelResults.length === 0) {
+						throw new Error("Delegated parallel execution returned no results.");
+					}
+					const failures = parallelResults.filter((result) => result.isError);
+					if (failures.length > 0) {
+						const failureText = failures
+							.map((failure) => `${failure.agent}: ${failure.errorText || "unknown delegated error"}`)
+							.join("; ");
+						throw new Error(`Delegated parallel execution failed: ${failureText}`);
+					}
+
+					const text = renderParallelDelegatedText(parallelResults);
+					pi.sendMessage({
+						customType: PROMPT_TEMPLATE_SUBAGENT_MESSAGE_TYPE,
+						content: text,
+						display: true,
+						details: {
+							requestId: response.requestId,
+							agent: request.agent,
+							task: preparedTasks.map((task) => task.task).join("\n\n"),
+							context: response.context,
+							model: response.model,
+							messages: [],
+							parallelResults,
+							isError: false,
+							errorText: response.errorText,
+						},
+					});
+
+					return {
+						changed: parallelResults.some((result) => delegatedMessagesChanged(result.messages)),
+						text,
+					};
+				}
+
+				const messages = coerceMessages(response.messages);
+				const text = extractDelegatedText(messages);
+				if (!text) {
+					throw new Error("Delegated subagent returned no assistant text.");
+				}
+
+				pi.sendMessage({
+					customType: PROMPT_TEMPLATE_SUBAGENT_MESSAGE_TYPE,
+					content: text,
+					display: true,
+					details: {
+						requestId: response.requestId,
+						agent: preparedTasks[0]!.agent,
+						task: request.task,
+						context: response.context,
+						model: response.model,
+						messages,
+						isError: false,
+						errorText: response.errorText,
+					},
+				});
+
+				return {
+					changed: delegatedMessagesChanged(messages),
+					text,
+				};
+			} catch (error) {
+				const cause = error instanceof Error ? error : new Error(String(error));
+				const responseText = cause.message;
+				const canRetry =
+					!isParallelRequest &&
+					attempt < maxRetries &&
+					isRetryableDelegatedErrorText(responseText) &&
+					!(signal?.aborted);
+				if (!canRetry) {
+					if (isParallelRequest) {
+						throw new Error(`Parallel delegated prompts (${promptLabel}) failed: ${responseText}`, { cause });
+					}
+					throw new Error(
+						`Prompt \`${preparedTasks[0]!.promptName}\` delegated subagent \`${preparedTasks[0]!.agent}\` failed: ${responseText}`,
+						{ cause },
+					);
+				}
+
+				const nextRetryModel = retryModelCandidates.length > 0
+					? retryModelCandidates[Math.min(attempt + 1, retryModelCandidates.length - 1)]
+					: undefined;
+				const switchingModels = Boolean(
+					selectedRetryModel &&
+					nextRetryModel &&
+					`${nextRetryModel.model.provider}/${nextRetryModel.model.id}` !== `${selectedRetryModel.model.provider}/${selectedRetryModel.model.id}`,
+				);
+				const delayMs = getDelegatedRetryDelayMs(attempt);
+				const retryTarget = switchingModels && nextRetryModel
+					? ` with fallback model \`${nextRetryModel.model.provider}/${nextRetryModel.model.id}\``
+					: "";
+				notify(
+					ctx,
+					`Retrying delegated prompt \`${preparedTasks[0]!.promptName}\`${retryTarget} after transient provider failure in ${Math.ceil(delayMs / 1000)}s.`,
+					"warning",
+				);
+				if (ctx.hasUI) {
+					ctx.ui.setWorkingMessage(
+						`Retrying delegated prompt with ${statusLabel}${retryTarget} in ${Math.ceil(delayMs / 1000)}s...`,
+					);
+				}
+				try {
+					await waitForDelegatedRetry(delayMs, signal);
+				} catch (retryError) {
+					const retryCause = retryError instanceof Error ? retryError : new Error(String(retryError));
+					throw new Error(
+						`Prompt \`${preparedTasks[0]!.promptName}\` delegated subagent \`${preparedTasks[0]!.agent}\` failed: ${retryCause.message}`,
+						{ cause: retryCause },
+					);
+				}
+			} finally {
+				clearDelegatedLiveState(request.requestId);
+			}
 		}
-
-		const messages = coerceMessages(response.messages);
-		const text = extractDelegatedText(messages);
-		if (!text) {
-			throw new Error("Delegated subagent returned no assistant text.");
-		}
-
-		pi.sendMessage({
-			customType: PROMPT_TEMPLATE_SUBAGENT_MESSAGE_TYPE,
-			content: text,
-			display: true,
-			details: {
-				requestId: response.requestId,
-				agent: preparedTasks[0]!.agent,
-				task: request.task,
-				context: response.context,
-				model: response.model,
-				messages,
-				isError: false,
-				errorText: response.errorText,
-			},
-		});
-
-		return {
-			changed: delegatedMessagesChanged(messages),
-			text,
-		};
-	} catch (error) {
-		const cause = error instanceof Error ? error : new Error(String(error));
-		const responseText = cause.message;
-		if (isParallelRequest) {
-			throw new Error(`Parallel delegated prompts (${promptLabel}) failed: ${responseText}`, { cause });
-		}
-		throw new Error(`Prompt \`${preparedTasks[0]!.promptName}\` delegated subagent \`${preparedTasks[0]!.agent}\` failed: ${responseText}`, { cause });
 	} finally {
-		clearDelegatedLiveState(request.requestId);
 		if (ctx.hasUI) {
 			ctx.ui.setStatus("prompt-subagent", undefined);
 			ctx.ui.setWorkingMessage();
 		}
 	}
+
+	return undefined;
 }
