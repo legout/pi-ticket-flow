@@ -92,7 +92,7 @@ function delegatedMessagesChanged(messages: Message[]): boolean {
 		if (message.role !== "assistant") continue;
 		for (const block of (message as AssistantMessage).content) {
 			if (block.type !== "toolCall") continue;
-			if (block.name === "write" || block.name === "edit") return true;
+			if (block.name === "write" || block.name === "edit" || block.name === "write_artifact") return true;
 		}
 	}
 	return false;

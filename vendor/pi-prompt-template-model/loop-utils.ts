@@ -14,6 +14,18 @@ interface CollectedSummaryData {
 	lastAssistantText: string;
 }
 
+const CHAIN_STOP_DIRECTIVE = /^\s*<!--\s*CHAIN_STOP\s*-->\s*$/gim;
+
+function stripChainControlDirectives(text: string): string {
+	return text.replace(CHAIN_STOP_DIRECTIVE, "").trim();
+}
+
+export function hasChainStopDirective(text: string | undefined): boolean {
+	if (!text) return false;
+	CHAIN_STOP_DIRECTIVE.lastIndex = 0;
+	return CHAIN_STOP_DIRECTIVE.test(text);
+}
+
 function collectAssistantActions(messages: Message[], filesRead: Set<string>, filesWritten: Set<string>): { commandCount: number; lastText: string } {
 	let commandCount = 0;
 	let lastText = "";
@@ -22,7 +34,8 @@ function collectAssistantActions(messages: Message[], filesRead: Set<string>, fi
 		if (msg.role !== "assistant") continue;
 		for (const block of (msg as AssistantMessage).content) {
 			if (block.type === "text") {
-				lastText = block.text;
+				const cleaned = stripChainControlDirectives(block.text);
+				if (cleaned) lastText = cleaned;
 				continue;
 			}
 			if (block.type !== "toolCall") continue;
@@ -31,8 +44,11 @@ function collectAssistantActions(messages: Message[], filesRead: Set<string>, fi
 				continue;
 			}
 			const path = (block.arguments as Record<string, unknown>).path as string | undefined;
+			const artifactName = (block.arguments as Record<string, unknown>).name as string | undefined;
 			if (block.name === "read" && path) filesRead.add(path);
+			if (block.name === "read_artifact" && artifactName) filesRead.add(`artifact:${artifactName}`);
 			if ((block.name === "write" || block.name === "edit") && path) filesWritten.add(path);
+			if (block.name === "write_artifact" && artifactName) filesWritten.add(`artifact:${artifactName}`);
 		}
 	}
 
@@ -122,7 +138,7 @@ export function didIterationMakeChanges(entries: SessionEntry[]): boolean {
 			if (entry.message.role !== "assistant") continue;
 			for (const block of (entry.message as AssistantMessage).content) {
 				if (block.type !== "toolCall") continue;
-				if (block.name === "write" || block.name === "edit") return true;
+				if (block.name === "write" || block.name === "edit" || block.name === "write_artifact") return true;
 			}
 			continue;
 		}
@@ -138,12 +154,28 @@ export function didIterationMakeChanges(entries: SessionEntry[]): boolean {
 				if (message.role !== "assistant") continue;
 				for (const block of (message as AssistantMessage).content) {
 					if (block.type !== "toolCall") continue;
-					if (block.name === "write" || block.name === "edit") return true;
+					if (block.name === "write" || block.name === "edit" || block.name === "write_artifact") return true;
 				}
 			}
 		}
 	}
 	return false;
+}
+
+export function getIterationLastAssistantText(entries: SessionEntry[]): string {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i];
+		if (entry?.type !== "message") continue;
+		const message = entry.message;
+		if (message.role !== "assistant") continue;
+		for (let j = (message as AssistantMessage).content.length - 1; j >= 0; j--) {
+			const block = (message as AssistantMessage).content[j];
+			if (block.type !== "text") continue;
+			const raw = block.text.trim();
+			if (raw) return raw;
+		}
+	}
+	return "";
 }
 
 export function getIterationEntries(ctx: Pick<ExtensionContext, "sessionManager">, startId: string | null): SessionEntry[] {

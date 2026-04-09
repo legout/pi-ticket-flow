@@ -6,6 +6,10 @@ restore: true
 ---
 Prepare the selected ticket for validation.
 
+If any prerequisite check fails and validation preparation cannot advance the workflow, end your response with the exact final line:
+
+`<!-- CHAIN_STOP -->`
+
 Procedure:
 1. Read `ticket-flow/invocation.md` using `read_artifact`.
 2. Parse it using exact single-occurrence line prefixes:
@@ -31,10 +35,15 @@ Procedure:
 10. If any of `implementation_artifact`, `validation_artifact`, or `review_artifact` does not contain the invocation `run_token`, stop and report that the invocation guard does not match the selected attempt.
 11. If `ticket` is `none` or `reset`, or any extracted path is `none`, stop and report that there is no ticket selected for validation preparation.
 12. If `stage` is not `waiting-worker`, stop and report that validation preparation can only run from the `waiting-worker` stage.
-13. Read the implementation artifact referenced there.
+13. Read the implementation artifact referenced there using `read_artifact`.
 14. If the implementation artifact is missing, stop and report that validation cannot proceed because implementation has not completed.
-15. If the implementation artifact indicates `status: blocked`, stop and report that implementation is blocked; leave `ticket-flow/current.md` unchanged so finalization can escalate directly from the implementation artifact.
-16. If the implementation artifact does not contain `status: ready-for-validation`, stop and report that the implementation artifact is not in a validation-ready state yet.
-17. Overwrite `ticket-flow/current.md` with the same values, but set:
+15. Parse the implementation artifact using exact single-occurrence line prefixes:
+   - `ticket:`
+   - `status:`
+16. If parsing fails, stop and report that the implementation artifact is malformed.
+17. If the implementation artifact `ticket:` does not exactly equal the current `ticket`, stop and report that implementation wrote an artifact for the wrong ticket.
+18. If the implementation artifact indicates `status: blocked`, stop and report that implementation is blocked; leave `ticket-flow/current.md` unchanged so finalization can escalate directly from the implementation artifact.
+19. If the implementation artifact does not contain `status: ready-for-validation`, stop and report that the implementation artifact is not in a validation-ready state yet.
+20. Overwrite `ticket-flow/current.md` with the same values, but set:
    - `stage: waiting-validation`
-18. End with a short summary including the ticket id and implementation status.
+21. End with a short summary including the ticket id and implementation status.

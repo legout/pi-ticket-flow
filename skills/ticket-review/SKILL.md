@@ -9,6 +9,18 @@ You are reviewing the **currently selected ticket** in the ticket-flow workflow.
 
 You do not implement fixes. You inspect the ticket, the implementation artifact, the validation artifact, the current diff, and write the durable review artifact expected by the workflow.
 
+## Session artifact rule
+
+All `ticket-flow/*` paths in this workflow are **session artifact names**, not repository-relative files.
+
+- Read them with `read_artifact(name: ...)`
+- Write them with `write_artifact(name: ...)`
+- Never use `read`, `write`, `edit`, or shell redirection on repo-root `ticket-flow/...`
+
+If you stop early because a guard, stage check, or artifact check fails, end your final response with the exact line:
+
+`<!-- CHAIN_STOP -->`
+
 ## Required procedure
 
 1. Read `ticket-flow/invocation.md` using `read_artifact`.
@@ -43,19 +55,32 @@ You do not implement fixes. You inspect the ticket, the implementation artifact,
 12. If `stage` is not `waiting-review`, stop and report that review can only run from the `waiting-review` stage.
 13. Read the ticket file.
 14. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
-15. Read the implementation artifact. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
-16. Read the validation artifact. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
-17. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
-18. Inspect the current diff and relevant changed files.
-19. Write the review artifact to the exact path from `ticket-flow/current.md`.
-20. Do not edit code.
-21. Do not call `tk add-note`.
-22. Do not call `tk close`.
-23. End with a short summary naming the ticket id, gate, and artifact path.
+15. Read the implementation artifact with `read_artifact(name: implementation_artifact)`. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
+16. Parse the implementation artifact using exact single-occurrence line prefixes:
+    - `ticket:`
+    - `status:`
+17. If parsing fails, stop and report that the implementation artifact is malformed.
+18. If the implementation artifact `ticket:` does not exactly equal the selected `ticket`, stop and report that implementation wrote an artifact for the wrong ticket.
+19. Read the validation artifact with `read_artifact(name: validation_artifact)`. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
+20. Parse the validation artifact using exact single-occurrence line prefixes:
+    - `ticket:`
+    - `status:`
+    - `source_implementation_artifact:`
+21. If parsing fails, stop and report that the validation artifact is malformed.
+22. If the validation artifact `ticket:` does not exactly equal the selected `ticket`, stop and report that validation wrote an artifact for the wrong ticket.
+23. If `source_implementation_artifact:` does not exactly equal the selected `implementation_artifact`, stop and report that validation references the wrong implementation artifact.
+24. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
+25. Inspect the current diff and relevant changed files.
+26. Write the review artifact with `write_artifact(name: review_artifact, content: ...)` using the exact artifact name from `ticket-flow/current.md`.
+27. The review artifact `ticket:` line must be exactly `<ticket-id>`.
+28. Do not edit code.
+29. Do not call `tk add-note`.
+30. Do not call `tk close`.
+31. End with a short summary naming the ticket id, gate, and artifact path.
 
 ## Artifact contract
 
-Write exactly one artifact at:
+Write exactly one artifact via `write_artifact` at:
 
 the exact `review_artifact` path from `ticket-flow/current.md`
 

@@ -7,3 +7,7 @@ skill: ticket-review
 restore: true
 ---
 Critically review the currently selected ticket.
+
+- Use `read_artifact` / `write_artifact` for all `ticket-flow/*` workflow state.
+- Review exactly the selected ticket and the matching implementation/validation artifacts.
+- If prerequisites fail and review cannot proceed, stop cleanly and end with `<!-- CHAIN_STOP -->`.

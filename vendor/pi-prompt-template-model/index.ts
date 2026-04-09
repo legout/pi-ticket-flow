@@ -3,7 +3,15 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@m
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import { extractChainContextFlag, extractLoopCount, extractLoopFlags, extractSubagentOverride, parseCommandArgs, type SubagentOverride } from "./args.js";
 import { parseChainSteps, parseChainDeclaration, type ChainStep, type ChainStepOrParallel, type ParallelChainStep } from "./chain-parser.js";
-import { generateChainStepSummary, generateIterationSummary, didIterationMakeChanges, getIterationEntries, wasIterationAborted } from "./loop-utils.js";
+import {
+	generateChainStepSummary,
+	generateIterationSummary,
+	didIterationMakeChanges,
+	getIterationEntries,
+	getIterationLastAssistantText,
+	hasChainStopDirective,
+	wasIterationAborted,
+} from "./loop-utils.js";
 import { notify, summarizePromptDiagnostics, diagnosticsFingerprint } from "./notifications.js";
 import { preparePromptExecution } from "./prompt-execution.js";
 import { buildPromptCommandDescription, expandCwdPath, loadPromptsWithModel, readSkillContent, resolveSkillPath, type PromptWithModel } from "./prompt-loader.js";
@@ -46,6 +54,7 @@ interface ExecutionErrorState {
 interface PromptStepResult {
 	changed: boolean;
 	text?: string;
+	stopChain?: boolean;
 }
 
 export default function promptModelExtension(pi: ExtensionAPI) {
@@ -219,7 +228,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 					notify(ctx, `Prompt \`${prompt.name}\` is not configured for delegated execution.`, "error");
 					return "aborted";
 				}
-				return { changed: delegated.changed, text: delegated.text };
+				return { changed: delegated.changed, text: delegated.text, stopChain: hasChainStopDirective(delegated.text) };
 			} catch (error) {
 				notify(ctx, error instanceof Error ? error.message : String(error), "error");
 				return "aborted";
@@ -271,7 +280,8 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 
 		const entries = getIterationEntries(ctx, startId);
 		if (wasIterationAborted(entries)) return "aborted";
-		return { changed: didIterationMakeChanges(entries) };
+		const lastAssistantText = getIterationLastAssistantText(entries);
+		return { changed: didIterationMakeChanges(entries), stopChain: hasChainStopDirective(lastAssistantText) };
 	}
 
 	async function restoreSessionState(
@@ -630,6 +640,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 		let chainErrorState: ExecutionErrorState = { hasError: false, error: undefined };
 		let lastDelegatedText: string | undefined;
 		let chainAborted = false;
+		let chainStopped = false;
 		if (effectiveMax > 1) {
 			loopState = { currentIteration: 1, totalIterations };
 			accumulatedSummaries = [];
@@ -676,6 +687,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 				);
 				const chainStepSummaries: string[] = [];
 				let aborted = false;
+				let stopRequested = false;
 				let iterationChanged = false;
 				let loopPrefix = "";
 				if (effectiveMax > 1) {
@@ -724,6 +736,11 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 							break;
 						}
 						lastDelegatedText = delegated.text;
+						if (hasChainStopDirective(delegated.text)) {
+							stopRequested = true;
+							chainStopped = true;
+							break;
+						}
 
 						currentModel = getCurrentModel(ctx);
 						const stepEntries = getIterationEntries(ctx, stepStartId);
@@ -791,6 +808,15 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 								aborted = true;
 								break;
 							}
+							if (stepResult.stopChain) {
+								chainStopped = true;
+								stopRequested = true;
+								if (shouldDelegatePrompt(singleStep.prompt, subagentOverride)) {
+									lastDelegatedText = stepResult.text;
+								}
+								currentModel = getCurrentModel(ctx);
+								break;
+							}
 							if (shouldDelegatePrompt(singleStep.prompt, subagentOverride)) {
 								lastDelegatedText = stepResult.text;
 							}
@@ -810,12 +836,17 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 						}
 					}
 
+					if (stopRequested) break;
 					if (aborted) break;
 					const stepEntries = getIterationEntries(ctx, stepStartId);
 					if (didIterationMakeChanges(stepEntries)) iterationChanged = true;
 					chainStepSummaries.push(generateChainStepSummary(stepEntries, singleStep.prompt.name, stepNumber));
 				}
 
+				if (stopRequested) {
+					notify(ctx, `${loopPrefix}Chain stopped by step outcome`, "info");
+					break;
+				}
 				if (aborted) {
 					chainAborted = true;
 					break;
@@ -868,7 +899,7 @@ export default function promptModelExtension(pi: ExtensionAPI) {
 			}
 		}
 
-		if (lastDelegatedText && !chainErrorState.hasError && !chainAborted) {
+		if (lastDelegatedText && !chainErrorState.hasError && !chainAborted && !chainStopped) {
 			pi.sendUserMessage(`[Delegated chain complete: ${chainStepNames}]\n\n${lastDelegatedText}`);
 			await waitForTurnStart(ctx);
 			await ctx.waitForIdle();

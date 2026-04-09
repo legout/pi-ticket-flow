@@ -20,7 +20,7 @@ It bundles:
 - full planning pipeline (`/plan`, `/plan-chain`)
 - ExecPlan-to-ticket conversion (`/ticketize`)
 - full plan-and-build pipeline (`/plan-and-build`)
-- delegated chain workflow (`/ticket-flow`)
+- delegated ticket workflow (`/ticket-flow`)
 - queue workflow (`/ticket-queue`)
 - reset command (`/ticket-reset`)
 - smoke test (`/bridge-smoke`)
@@ -48,7 +48,7 @@ It bundles:
 
 ### Execution Commands
 
-- `/ticket-flow` — delegated chain workflow for exactly one ticket (pick → implement → validate/fix → review → finalize)
+- `/ticket-flow` — delegated single-ticket workflow (pick → implement → validate/fix → review → finalize)
 - `/ticket-queue` — sequential queue processing until no eligible tickets remain (loops, tracks progress/lessons)
 - `/ticket-test-fix` — validate and fix the currently selected ticket until it is ready for review
 - `/ticket-review-deep` — deep ticket review with parallel review passes and final consolidation
@@ -66,6 +66,8 @@ It bundles:
 - `change-planner` — shared planner for refactor/simplify analysis and todo creation
 
 Ticket implementation, validation/fix-to-green, and review use the base `worker` and `reviewer` agents provided by `pi-interactive-subagents`, specialized through the `ticket-implement`, `ticket-test-fix`, and `ticket-review` skills/prompts.
+
+Ticket-flow runtime state lives in **session artifacts** (`write_artifact` / `read_artifact`), not in repo-root `ticket-flow/` files. Automatic selection targets **leaf tickets only** and skips epics or parent tickets with open children.
 
 ## Install
 

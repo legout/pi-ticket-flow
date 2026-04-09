@@ -26,6 +26,10 @@ These are workflow handoff files created during execution:
 | `ticket-flow/progress.md` | Queue progress |
 | `ticket-flow/lessons-learned.md` | Queue learnings |
 
+Important: these are **session artifacts**, not normal repository files.
+Use `read_artifact` / `write_artifact` for all `ticket-flow/*` workflow state.
+Do not create or inspect orchestrator state with repo-file tools (`read`, `write`, `edit`, shell redirection) against a checked-in `ticket-flow/` directory; that creates state the orchestrator will not see.
+
 ## `ticket-flow/invocation.md`
 
 Required keys:

@@ -16,6 +16,12 @@ Rules:
 - It must not close tickets.
 - It initializes new work only; it does not resume unfinished `ticket-flow/current.md` state.
 
+If this procedure ends **without** selecting a ticket, end your response with the exact final line:
+
+`<!-- CHAIN_STOP -->`
+
+That marker tells the parent prompt chain not to continue into implementation, validation, review, or finalization steps.
+
 ## Invocation mode
 
 Interpret the first argument exactly:
@@ -107,9 +113,12 @@ reason: selection not completed
 12. Inspect candidates in listed order:
    - prefer tickets already marked `[in_progress]`
    - then consider the remaining ready tickets
-13. For each candidate, inspect its notes with `tk show <ticket-id>` and inspect the Notes section.
-   - If the notes contain `Gate: ESCALATE`, skip that ticket.
-14. Pick the first eligible ticket.
+13. For each candidate, inspect `tk show <ticket-id>`.
+   - If the Notes section contains `Gate: ESCALATE`, skip that ticket.
+   - If the ticket is `type: epic`, skip that ticket.
+   - If the Children section contains any child marked `[open]` or `[in_progress]`, skip that ticket.
+   - Automatic ticket-flow selection should target **leaf tickets** only.
+14. Pick the first eligible leaf ticket.
 15. If no eligible ticket remains:
     - **Queue run:** same as step 11 queue path (progress → invocation blocked with `reason: queue complete` → tombstone including `validation_artifact: none` → `signal_loop_success` → stop).
     - **Single-ticket run:** report that all ready tickets are escalated or ineligible and stop.
