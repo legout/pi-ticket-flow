@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildTaskMessage,
   ensureAssistantSummary,
+  formatLoadedSkillBlock,
 } from "../extensions/bridge-message-utils.ts";
 
 function runCase(name: string, fn: () => void): boolean {
@@ -34,6 +35,14 @@ const ticketTask = [
 let failures = 0;
 
 if (!runCase("specialized delegated tasks put ticket contract ahead of generic worker guidance", () => {
+  const delegatedSkill = formatLoadedSkillBlock(
+    "ticket-implement",
+    [
+      "# Ticket Implement",
+      "",
+      "Write the implementation artifact using exact lowercase `ticket:` and `status:` lines.",
+    ].join("\n"),
+  );
   const message = buildTaskMessage(
     {
       autoExit: true,
@@ -42,14 +51,43 @@ if (!runCase("specialized delegated tasks put ticket contract ahead of generic w
     ticketTask,
     "fresh",
     "ticket-implement",
+    delegatedSkill,
   );
 
   assert.match(message, /Task-specific prompt and skill instructions are the authoritative workflow contract/);
+  assert.match(message, /<skill name="ticket-implement">/);
   assert.ok(
-    message.indexOf("Implement the currently selected ticket only.") < message.indexOf("# Worker Agent"),
-    "ticket contract should appear before the generic worker instructions",
+    message.indexOf("<skill name=\"ticket-implement\">") < message.indexOf("Implement the currently selected ticket only."),
+    "resolved skill instructions should appear before the delegated task",
   );
+  assert.doesNotMatch(message, /# Worker Agent/);
   assert.match(message, /Do not reinterpret ticket ids \(for example `flo-1234`\) as todo ids/);
+})) failures++;
+
+if (!runCase("forked specialized delegated tasks still inline resolved skill instructions", () => {
+  const delegatedSkill = formatLoadedSkillBlock(
+    "ticket-review",
+    [
+      "# Ticket Review",
+      "",
+      "Write the review artifact using exact lowercase `ticket:` and `gate:` lines.",
+    ].join("\n"),
+  );
+
+  const message = buildTaskMessage(
+    {
+      autoExit: true,
+      body: genericWorkerBody,
+    },
+    "Review the selected ticket.",
+    "fork",
+    "ticket-review",
+    delegatedSkill,
+  );
+
+  assert.match(message, /Task-specific prompt and skill instructions are the authoritative workflow contract/);
+  assert.match(message, /<skill name="ticket-review">/);
+  assert.match(message, /Review the selected ticket\./);
 })) failures++;
 
 if (!runCase("generic delegated tasks keep legacy worker-first ordering when no specialized skill is present", () => {

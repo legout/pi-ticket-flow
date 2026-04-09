@@ -24,7 +24,8 @@ import {
   type RoleMessage,
   type SessionEntryLike,
 } from "./delegated-subagent-outcome.ts";
-import { buildTaskMessage, ensureAssistantSummary } from "./bridge-message-utils.ts";
+import { buildTaskMessage, ensureAssistantSummary, formatLoadedSkillBlock } from "./bridge-message-utils.ts";
+import { readSkillContent, resolveSkillPath } from "../vendor/pi-prompt-template-model/prompt-loader.ts";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -182,6 +183,13 @@ function normalizeSkillName(skillName: string): string {
   return skillName.startsWith("skill:") ? skillName.slice("skill:".length) : skillName;
 }
 
+function isPathResolvableSkillName(skillName: string): boolean {
+  if (skillName === "." || skillName === "..") return false;
+  if (skillName.includes("/")) return false;
+  if (skillName.includes("\\")) return false;
+  return true;
+}
+
 function parseSkillList(value: string | undefined): string[] {
   if (!value) return [];
   return value
@@ -193,6 +201,43 @@ function parseSkillList(value: string | undefined): string[] {
 function mergeSkillLists(agentSkills: string | undefined, promptSkill: string | undefined): string | undefined {
   const merged = [...new Set([...parseSkillList(agentSkills), ...parseSkillList(promptSkill)])];
   return merged.length > 0 ? merged.join(",") : undefined;
+}
+
+function resolveRegisteredSkillPath(pi: ExtensionAPI, skillName: string): string | undefined {
+  const normalizedSkillName = normalizeSkillName(skillName);
+  if (!normalizedSkillName) return undefined;
+
+  const candidates = new Set([normalizedSkillName, `skill:${normalizedSkillName}`]);
+  for (const command of pi.getCommands()) {
+    if (command.source !== "skill") continue;
+    if (!candidates.has(command.name)) continue;
+    const path = command.sourceInfo?.path;
+    if (typeof path === "string" && path.length > 0) {
+      return path;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveDelegatedSkillInstructions(pi: ExtensionAPI, cwd: string, skills: string | undefined): string | undefined {
+  const requestedSkills = parseSkillList(skills);
+  if (requestedSkills.length === 0) return undefined;
+
+  const blocks: string[] = [];
+  for (const skillName of requestedSkills) {
+    const normalizedSkillName = normalizeSkillName(skillName);
+    const skillPath = resolveRegisteredSkillPath(pi, normalizedSkillName)
+      ?? (isPathResolvableSkillName(normalizedSkillName) ? resolveSkillPath(normalizedSkillName, cwd) : undefined);
+
+    if (!skillPath) {
+      throw new Error(`Delegated skill \`${skillName}\` not found.`);
+    }
+
+    blocks.push(formatLoadedSkillBlock(normalizedSkillName, readSkillContent(skillPath)));
+  }
+
+  return blocks.join("\n\n");
 }
 
 function applyThinkingSuffix(model: string, thinking: string | undefined): string {
@@ -371,6 +416,7 @@ function createForkCleanupFile(sourceSessionFile: string): { path: string; basel
 }
 
 async function launchTask(
+  pi: ExtensionAPI,
   taskReq: DelegatedSubagentTask,
   request: DelegatedSubagentRequest,
   ctx: ExtensionContext,
@@ -389,10 +435,9 @@ async function launchTask(
     throw new Error(`Delegated agent \`${taskReq.agent}\` not found.`);
   }
 
-  const taskMessage = buildTaskMessage(agentDefs, taskReq.task, request.context, taskReq.skill ?? request.skill);
+  const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
   const effectiveModel = taskReq.model ?? request.model ?? agentDefs.model;
   const effectiveTools = agentDefs.tools;
-  const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
   const effectiveThinking = taskReq.thinking ?? request.thinking ?? agentDefs.thinking;
   const deniedTools = resolveDeniedTools(agentDefs);
   const sessionFile = ctx.sessionManager.getSessionFile()!;
@@ -400,6 +445,26 @@ async function launchTask(
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23) + "Z";
   const sessionId = `${request.requestId}-${index}-${Math.random().toString(16).slice(2, 10)}`;
   const subagentSessionFile = join(sessionDir, `${timestamp}_${sessionId}.jsonl`);
+  const rawCwd = request.cwd || agentDefs.cwd || ctx.cwd;
+  const cwdIsFromAgent = !request.cwd && agentDefs.cwd != null;
+  const cwdBase = cwdIsFromAgent ? getAgentConfigDir() : ctx.cwd;
+  const effectiveCwd = rawCwd.startsWith("/") ? rawCwd : join(cwdBase, rawCwd);
+
+  if (effectiveCwd !== ctx.cwd && !existsSync(effectiveCwd)) {
+    throw new Error(`cwd directory does not exist: ${effectiveCwd}`);
+  }
+
+  // Do not pass /skill:... as a positional CLI argument. In delegated non-interactive
+  // launches it gets concatenated into the initial user message instead of loading the
+  // skill, so inline the resolved skill instructions into the delegated task payload.
+  const delegatedSkillInstructions = resolveDelegatedSkillInstructions(pi, effectiveCwd, effectiveSkills);
+  const taskMessage = buildTaskMessage(
+    agentDefs,
+    taskReq.task,
+    request.context,
+    effectiveSkills,
+    delegatedSkillInstructions,
+  );
 
   let surface: string | undefined;
   let forkCleanupFile: string | undefined;
@@ -452,12 +517,6 @@ async function launchTask(
       }
     }
 
-    if (effectiveSkills) {
-      for (const skill of effectiveSkills.split(",").map((s) => s.trim()).filter(Boolean)) {
-        parts.push(shellEscape(`/skill:${skill}`));
-      }
-    }
-
     const envParts: string[] = [];
     if (process.env.PI_CODING_AGENT_DIR) {
       envParts.push(`PI_CODING_AGENT_DIR=${shellEscape(process.env.PI_CODING_AGENT_DIR)}`);
@@ -480,10 +539,6 @@ async function launchTask(
       parts.push(shellEscape(`@${taskArtifactPath}`));
     }
 
-    const rawCwd = request.cwd || agentDefs.cwd || ctx.cwd;
-    const cwdIsFromAgent = !request.cwd && agentDefs.cwd != null;
-    const cwdBase = cwdIsFromAgent ? getAgentConfigDir() : ctx.cwd;
-    const effectiveCwd = rawCwd.startsWith("/") ? rawCwd : join(cwdBase, rawCwd);
     const envPrefix = envParts.length > 0 ? `${envParts.join(" ")} ` : "";
     const cdPrefix = effectiveCwd ? `cd ${shellEscape(effectiveCwd)} && ` : "";
     throwIfAborted(abortController);
@@ -605,6 +660,7 @@ async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagent
   runningRequests.set(request.requestId, { controllers: [abortController] });
   try {
     const task = await launchTask(
+      pi,
       {
         agent: request.agent,
         task: request.task,
@@ -653,7 +709,7 @@ async function processParallelRequest(pi: ExtensionAPI, request: DelegatedSubage
   runningRequests.set(request.requestId, { controllers });
   try {
     const launchResults = await Promise.allSettled(
-      tasks.map((task, index) => launchTask(task, request, ctx, index, controllers[index]!)),
+      tasks.map((task, index) => launchTask(pi, task, request, ctx, index, controllers[index]!)),
     );
     const launched = launchResults
       .filter((result): result is PromiseFulfilledResult<RunningTask> => result.status === "fulfilled")

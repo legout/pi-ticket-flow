@@ -1,6 +1,6 @@
 ---
 description: Validate and fix the currently selected ticket using the base worker agent
-model: openai-codex/gpt-5.4-mini, kimi-coding/k2p5, zai/glm-5.1
+model: zai/glm-5.1, openai-codex/gpt-5.4-mini, kimi-coding/k2p5
 subagent: worker
 inheritContext: false
 skill: ticket-test-fix

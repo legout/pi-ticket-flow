@@ -6,6 +6,19 @@ export interface BridgeAgentMessageDefaults {
   body?: string;
 }
 
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+export function formatLoadedSkillBlock(skillName: string, skillContent: string): string {
+  return `<skill name="${escapeXml(skillName)}">\n${skillContent}\n</skill>`;
+}
+
 export function ensureAssistantSummary(messages: unknown[], fallbackText: string): unknown[] {
   const lastText = getLastAssistantText(messages as RoleMessage[]);
   if (lastText) return messages;
@@ -23,6 +36,7 @@ export function buildTaskMessage(
   task: string,
   context: "fresh" | "fork",
   delegatedSkill?: string,
+  delegatedSkillInstructions?: string,
 ): string {
   const modeHint = agentDefaults?.autoExit
     ? "Complete your task autonomously."
@@ -31,8 +45,17 @@ export function buildTaskMessage(
     ? "Your FINAL assistant message should summarize what you accomplished."
     : "Your FINAL assistant message (before calling subagent_done or before the user exits) should summarize what you accomplished.";
 
+  const hasResolvedSkillInstructions = typeof delegatedSkillInstructions === "string" && delegatedSkillInstructions.trim().length > 0;
+
   if (context === "fork") {
-    return task;
+    if (!hasResolvedSkillInstructions) {
+      return task;
+    }
+    return [
+      "Task-specific prompt and skill instructions are the authoritative workflow contract for this run.",
+      delegatedSkillInstructions,
+      task,
+    ].join("\n\n");
   }
 
   const hasSpecializedContract = typeof delegatedSkill === "string" && delegatedSkill.trim().length > 0;
@@ -47,9 +70,16 @@ export function buildTaskMessage(
   const parts = hasSpecializedContract
     ? [
         contractPreamble,
+        hasResolvedSkillInstructions ? delegatedSkillInstructions : null,
         task,
         modeHint,
-        agentDefaults?.body && !agentDefaults.systemPromptMode ? agentDefaults.body : null,
+        // Once the delegated skill is fully inlined, prefer it over the generic agent body
+        // so conflicting format requirements do not leak into ticket-flow artifacts.
+        hasResolvedSkillInstructions
+          ? null
+          : agentDefaults?.body && !agentDefaults.systemPromptMode
+            ? agentDefaults.body
+            : null,
         summaryInstruction,
       ]
     : [
