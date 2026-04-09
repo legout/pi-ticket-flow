@@ -24,6 +24,7 @@ import {
   type RoleMessage,
   type SessionEntryLike,
 } from "./delegated-subagent-outcome.ts";
+import { buildTaskMessage, ensureAssistantSummary } from "./bridge-message-utils.ts";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -322,18 +323,6 @@ function assistantTokens(messages: RoleMessage[]): number {
   return tokens;
 }
 
-function ensureAssistantSummary(messages: unknown[], fallbackText: string): unknown[] {
-  const lastText = lastAssistantText(messages as RoleMessage[]);
-  if (lastText) return messages;
-  return [
-    ...messages,
-    {
-      role: "assistant",
-      content: [{ type: "text", text: fallbackText || "Delegated subagent completed." }],
-    },
-  ];
-}
-
 function emitUpdate(pi: ExtensionAPI, update: DelegatedSubagentUpdate) {
   pi.events.emit(UPDATE_EVENT, update);
 }
@@ -350,28 +339,6 @@ function resolveDeniedTools(agentDefs: AgentDefaults | null): string[] {
     }
   }
   return [...denied];
-}
-
-function buildTaskMessage(agentDefs: AgentDefaults | null, task: string, context: "fresh" | "fork"): string {
-  const modeHint = agentDefs?.autoExit
-    ? "Complete your task autonomously."
-    : "Complete your task. When finished, call the subagent_done tool. The user can interact with you at any time.";
-  const summaryInstruction = agentDefs?.autoExit
-    ? "Your FINAL assistant message should summarize what you accomplished."
-    : "Your FINAL assistant message (before calling subagent_done or before the user exits) should summarize what you accomplished.";
-
-  if (context === "fork") {
-    return task;
-  }
-
-  const parts = [
-    agentDefs?.body && !agentDefs.systemPromptMode ? agentDefs.body : null,
-    modeHint,
-    task,
-    summaryInstruction,
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.join("\n\n");
 }
 
 function writeTaskArtifact(ctx: ExtensionContext, name: string, content: string): string {
@@ -422,7 +389,7 @@ async function launchTask(
     throw new Error(`Delegated agent \`${taskReq.agent}\` not found.`);
   }
 
-  const taskMessage = buildTaskMessage(agentDefs, taskReq.task, request.context);
+  const taskMessage = buildTaskMessage(agentDefs, taskReq.task, request.context, taskReq.skill ?? request.skill);
   const effectiveModel = taskReq.model ?? request.model ?? agentDefs.model;
   const effectiveTools = agentDefs.tools;
   const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
@@ -568,7 +535,7 @@ function snapshotTask(task: RunningTask): TaskProgressSnapshot {
   const entries = getNewEntries(task.sessionFile, task.baselineEntryCount);
   const messages = extractRoleMessages(entries as SessionEntryLike[]);
   const { name: currentTool, args: currentToolArgs } = getLastAssistantTool(messages);
-  const outputText = lastAssistantText(messages) ?? getTerminalAssistantFailure(messages)?.text;
+  const outputText = getLastAssistantText(messages) ?? getTerminalAssistantFailure(messages)?.text;
   return {
     status: "running",
     currentTool,
