@@ -3,14 +3,13 @@ description: Delegate ticket implementation to the base worker agent using the t
 model: kimi-coding/k2p5, zai/glm-5-turbo, minimax/MiniMax-M2.7, openai-codex/gpt-5.4-mini
 subagent: worker
 inheritContext: false
-skill: ticket-implement
+skill: ticket-flow-delegated-handoff,ticket-implement
 restore: true
 ---
 Implement the currently selected ticket only.
 
 - Use `read_artifact` / `write_artifact` for all `ticket-flow/*` workflow state.
-- Read machine state from `ticket-flow/invocation.json` and `ticket-flow/current.json`.
-- Derive the implementation artifact path from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
+- Follow the shared delegated handoff skill loaded for this step.
 - Do **not** implement a child ticket or sibling ticket instead of the selected ticket.
 - Do **not** run repo validation commands here; leave the result ready for validation.
 - Write only the implementation artifact for this step; do **not** advance the workflow beyond implementation.

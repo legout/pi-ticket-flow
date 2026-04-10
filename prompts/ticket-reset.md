@@ -21,7 +21,7 @@ Procedure:
 2. Try `read_artifact(name: "ticket-flow/invocation.json")`.
 3. Also try `read_artifact(name: "ticket-flow/current.md")` and `read_artifact(name: "ticket-flow/invocation.md")` only as a legacy cleanup check.
 4. If all four artifacts are missing, report that there is nothing to reset and stop.
-5. If `ticket-flow/current.json` exists, briefly summarize its `ticket` and `stage`.
+5. If `ticket-flow/current.json` exists, briefly summarize its `stage`.
 6. If `ticket-flow/invocation.json` exists, briefly summarize its `status`, `mode`, and `ticket`.
 7. If legacy markdown state exists, mention that legacy state was also found and will be cleared.
 8. Overwrite `ticket-flow/current.json` with:
@@ -29,8 +29,6 @@ Procedure:
 ```json
 {
   "version": 2,
-  "ticket": null,
-  "ticket_path": null,
   "stage": "done",
   "reason": "manual reset via /ticket-reset"
 }
@@ -44,6 +42,7 @@ Procedure:
   "status": "blocked",
   "mode": "single",
   "ticket": null,
+  "ticket_path": null,
   "run_token": null,
   "reason": "manual reset via /ticket-reset"
 }

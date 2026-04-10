@@ -2,6 +2,7 @@
 description: Internal deep ticket review consolidation step
 model: openai-codex/gpt-5.4-mini
 thinking: high
+skill: ticket-flow-delegated-handoff
 restore: true
 ---
 Perform the final consolidation for the deep review of the currently selected ticket.
@@ -10,25 +11,24 @@ The immediately preceding chain step ran multiple independent ticket review pass
 Use their candidate review outputs from the conversation above as the primary input.
 You may re-read the ticket state, ticket file, implementation artifact, diff, and changed files if needed.
 
+- Follow the shared delegated handoff skill loaded for this step.
+
 Required procedure:
-1. Read `ticket-flow/invocation.json` using `read_artifact`.
-2. Parse it as JSON and require `status: armed`, plus `ticket` and `run_token`.
-3. Read `ticket-flow/current.json` using `read_artifact`.
-4. Parse it as JSON and require matching `ticket` and present `ticket_path`.
-5. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
-6. Read the ticket file.
-7. If the ticket contains an ExecPlan Reference section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
-8. Read the implementation artifact. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
-9. Read the validation artifact. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
-10. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
-11. Review the candidate review outputs from the conversation and keep only findings you can support.
-12. Eliminate duplicates and false positives.
-13. Decide the final `gate: PASS | REVISE`.
-14. Write exactly one canonical final review artifact to the derived `review` path using `write_artifact`.
-15. Do not edit code.
-16. Do not call `tk add-note`.
-17. Do not call `tk close`.
-18. End with a short summary naming the ticket id, gate, and artifact path.
+1. Parse the delegated handoff as required by the shared handoff skill.
+2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
+3. Read the ticket file at `ticket_path`.
+4. If the ticket contains an ExecPlan Reference section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
+5. Read the implementation artifact. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
+6. Read the validation artifact. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
+7. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
+8. Review the candidate review outputs from the conversation and keep only findings you can support.
+9. Eliminate duplicates and false positives.
+10. Decide the final `gate: PASS | REVISE`.
+11. Write exactly one canonical final review artifact to the derived `review` path using `write_artifact`.
+12. Do not edit code.
+13. Do not call `tk add-note`.
+14. Do not call `tk close`.
+15. End with a short summary naming the ticket id, gate, and artifact path.
 
 Write the canonical artifact in this exact format:
 

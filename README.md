@@ -257,7 +257,7 @@ Artifacts used by the workflow:
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
 
-`invocation.json` and `current.json` are the operational source of truth. Per-run artifact paths are derived deterministically from `ticket` + `run_token`, which reduces duplicated machine state and makes the workflow less fragile.
+`invocation.json` is the main-session source of truth for the active ticket, ticket path, and run token. `current.json` is now just a lightweight active/done marker. Fresh delegated worker / reviewer steps consume a compact `Selection handoff JSON: ...` summary from `ticket-pick` plus deterministic per-run artifact paths derived from `ticket` + `run_token`, which reduces cross-session fragility.
 
 ## Notes
 

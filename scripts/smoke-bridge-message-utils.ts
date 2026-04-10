@@ -90,6 +90,47 @@ if (!runCase("forked specialized delegated tasks still inline resolved skill ins
   assert.match(message, /Review the selected ticket\./);
 })) failures++;
 
+if (!runCase("delegated tasks can inline shared and specialized skills together", () => {
+  const delegatedSkills = [
+    formatLoadedSkillBlock(
+      "ticket-flow-delegated-handoff",
+      [
+        "# Ticket Flow Delegated Handoff",
+        "",
+        "Parse `Selection handoff JSON: {...}` and treat it as authoritative.",
+      ].join("\n"),
+    ),
+    formatLoadedSkillBlock(
+      "ticket-implement",
+      [
+        "# Ticket Implement",
+        "",
+        "Write the implementation artifact using exact lowercase `ticket:` and `status:` lines.",
+      ].join("\n"),
+    ),
+  ].join("\n\n");
+
+  const message = buildTaskMessage(
+    {
+      autoExit: true,
+      body: genericWorkerBody,
+    },
+    ticketTask,
+    "fresh",
+    "ticket-flow-delegated-handoff,ticket-implement",
+    delegatedSkills,
+  );
+
+  assert.ok(
+    message.indexOf('<skill name="ticket-flow-delegated-handoff">') < message.indexOf('<skill name="ticket-implement">'),
+    "shared handoff skill should appear before the step-specific skill",
+  );
+  assert.ok(
+    message.indexOf('<skill name="ticket-implement">') < message.indexOf('Implement the currently selected ticket only.'),
+    "all resolved skill instructions should appear before the delegated task",
+  );
+})) failures++;
+
 if (!runCase("generic delegated tasks keep legacy worker-first ordering when no specialized skill is present", () => {
   const message = buildTaskMessage(
     {

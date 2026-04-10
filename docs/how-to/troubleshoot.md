@@ -52,7 +52,7 @@ This writes a safe JSON tombstone to `ticket-flow/current.json` and a blocked se
 
 If `/ticket-queue` stops immediately because it found unfinished or malformed orchestrator state, that is intentional — fix the stale state with `/ticket-reset` before retrying the queue.
 
-## Validation or review does not advance
+## Validation or review does not complete
 
 Transient delegated-provider overloads (`429`, `temporarily overloaded`, rate-limit style errors) are retried automatically with backoff. If the delegated prompt lists multiple models, retries can fall back to the next configured model.
 
@@ -62,12 +62,17 @@ Inspect:
 - `ticket-flow/current.json`
 - the referenced implementation, validation, and review artifacts
 
+Remember:
+
+- `invocation.json` carries the active ticket id, ticket path, and run token
+- `current.json` is only an active/done marker
+
 Common causes:
 
 - implementation artifact is `blocked`
 - validation artifact is missing or not `ready-for-review`
+- delegated selection handoff is missing or malformed in chain context
 - the invocation guard is still `blocked`
-- `current.json` stage does not match the artifact state
 - the implementation artifact no longer matches the actual worktree
 
 ## Queue finishes immediately

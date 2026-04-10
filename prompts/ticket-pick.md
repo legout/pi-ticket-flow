@@ -33,6 +33,23 @@ Legacy markdown state files may still exist from older runs:
 
 If legacy state exists, stop and tell the user to run `/ticket-reset` so the session can be migrated cleanly.
 
+## Delegated handoff contract
+
+Fresh delegated worker / reviewer steps do **not** read `ticket-flow/invocation.json` or `ticket-flow/current.json`.
+Instead, they consume a compact handoff string that this step must emit in its final assistant message.
+
+If you select a ticket, the **first line** of your final assistant message must be exactly:
+
+`Selection handoff JSON: {"ticket":"<ticket-id>","ticket_path":"<ticket-path>","mode":"<single|queue>","run_token":"<run-token>"}`
+
+Rules for this handoff:
+- keep it on one line
+- use compact JSON
+- do not wrap it in code fences
+- do not add extra keys
+- do not include markdown tables
+- keep any additional human summary short so the handoff survives chain-context summarization
+
 ## Invocation mode
 
 Interpret the first argument exactly:
@@ -49,6 +66,7 @@ Before doing selection work, overwrite `ticket-flow/invocation.json` with this b
   "status": "blocked",
   "mode": "single or queue",
   "ticket": null,
+  "ticket_path": null,
   "run_token": null,
   "reason": "selection not completed"
 }
@@ -97,8 +115,6 @@ Add only durable, reusable lessons learned from implementing tickets.
 6. Try `read_artifact(name: "ticket-flow/current.json")`.
 7. If `ticket-flow/current.json` exists, parse it as JSON. Required keys:
    - `version`
-   - `ticket`
-   - `ticket_path`
    - `stage`
    - optional `reason`
 8. If `ticket-flow/current.json` is malformed, keep invocation blocked, report malformed state, and tell the user to run `/ticket-reset`.
@@ -112,7 +128,7 @@ Add only durable, reusable lessons learned from implementing tickets.
 13. Call `ticket_flow_select`.
 14. Parse its JSON output.
 15. If helper returns `outcome: "none-ready"`:
-    - **Queue mode:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`, `current_run_token: none`; write blocked `ticket-flow/invocation.json` with `reason: "queue complete"`; write `ticket-flow/current.json` tombstone with `ticket: null`, `ticket_path: null`, `stage: "done"`, and `reason: "queue complete"`; call `signal_loop_success`; stop.
+    - **Queue mode:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`, `current_run_token: none`; write blocked `ticket-flow/invocation.json` with `reason: "queue complete"`; write `ticket-flow/current.json` tombstone with `stage: "done"` and `reason: "queue complete"`; call `signal_loop_success`; stop.
     - **Single mode:** report that there are no ready tickets and stop.
 16. If helper returns `outcome: "no-eligible"`:
     - **Queue mode:** same completion path as step 15 queue mode.
@@ -129,9 +145,7 @@ Add only durable, reusable lessons learned from implementing tickets.
 ```json
 {
   "version": 2,
-  "ticket": "<ticket-id>",
-  "ticket_path": ".tickets/<ticket-id>.md",
-  "stage": "waiting-worker",
+  "stage": "active",
   "reason": "selected ticket"
 }
 ```
@@ -144,6 +158,7 @@ Add only durable, reusable lessons learned from implementing tickets.
   "status": "armed",
   "mode": "<single|queue>",
   "ticket": "<ticket-id>",
+  "ticket_path": ".tickets/<ticket-id>.md",
   "run_token": "<run-token>",
   "reason": "selected ticket"
 }
@@ -154,4 +169,4 @@ Add only durable, reusable lessons learned from implementing tickets.
     - `last_updated: <now>`
     - `current_ticket: <ticket-id>`
     - `current_run_token: <run-token>`
-24. End with a short summary including the selected ticket id and run token.
+24. End with a short summary. The first line must be the exact `Selection handoff JSON: ...` line described above, followed by a brief human-readable confirmation. Do **not** include markdown tables.

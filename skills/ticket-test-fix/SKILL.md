@@ -1,6 +1,6 @@
 ---
 name: ticket-test-fix
-description: Validate and fix the currently selected ticket using the worker agent. Reads simplified ticket-flow JSON state, validates the current checkout, and writes the validation artifact for the active ticket-flow attempt.
+description: Validate and fix the currently selected ticket using the worker agent. Consumes delegated selection handoff from chain context, validates the current checkout, and writes the validation artifact for the active ticket-flow attempt.
 ---
 
 # Ticket Test Fix
@@ -19,7 +19,7 @@ All `ticket-flow/*` paths in this workflow are **session artifact names**, not r
 - Write them with `write_artifact(name: ...)`
 - Never use `read`, `write`, `edit`, or shell redirection on repo-root `ticket-flow/...`
 
-If you stop early because a malformed/unarmed state or a missing required workflow artifact prevents validation from starting, end your final response with the exact line:
+If you stop early because a malformed handoff or a missing required workflow artifact prevents validation from starting, end your final response with the exact line:
 
 `<!-- CHAIN_STOP -->`
 
@@ -28,10 +28,9 @@ Do **not** emit `<!-- CHAIN_STOP -->` for normal workflow outcomes that finaliza
 - validation already recorded as `blocked`
 - validation already recorded as `ready-for-review`
 
-## State files
+The shared `ticket-flow-delegated-handoff` skill is loaded alongside this skill. Follow that handoff contract exactly.
 
-- `ticket-flow/invocation.json`
-- `ticket-flow/current.json`
+## Artifact derivation
 
 Per-run artifact paths are derived deterministically from `ticket` + `run_token` using the `ticket_flow_artifact_paths` tool.
 
@@ -47,75 +46,33 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 
 ## Required procedure
 
-1. Read `ticket-flow/invocation.json` with `read_artifact`.
-2. Parse it as JSON. Required keys:
-   - `status`
-   - `mode`
-   - `ticket`
-   - `run_token`
-   - `reason`
-3. If parsing fails, stop and report that validation is not armed for this invocation.
-4. If `status` is not `armed`, stop and report that validation is not armed for this invocation.
-5. Read `ticket-flow/current.json` with `read_artifact`.
-6. Parse it as JSON. Required keys:
-   - `ticket`
-   - `ticket_path`
-   - `stage`
-   - optional `reason`
-7. If parsing fails, stop and tell the user to run `/ticket-reset`.
-8. Ensure:
-   - `current.ticket === invocation.ticket`
-   - `current.ticket_path` is present
-   - `current.stage` is either `waiting-worker` or `waiting-validation`
-9. If any of those checks fail, stop and report the mismatch.
-10. Derive artifact paths from `invocation.ticket` + `invocation.run_token` using `ticket_flow_artifact_paths`.
-11. If a validation artifact already exists at the derived validation path and indicates `status: ready-for-review` or `status: blocked`, report that validation is already recorded and stop normally so downstream review/finalization can continue.
-12. Read the implementation artifact at the derived implementation path.
-13. If it is missing, stop and report that validation cannot proceed because implementation has not completed.
-14. Parse the implementation artifact and verify:
-    - `ticket:` exactly matches the selected ticket
-    - `status:` is present
-15. If parsing fails, stop and report that the implementation artifact is malformed.
-16. If the implementation artifact says `status: blocked`, report that validation is skipped because implementation is blocked, and stop normally so finalization can escalate.
-17. If the implementation artifact does not say `status: ready-for-validation`, stop and report that implementation is not validation-ready.
-18. Read the ticket file.
-19. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while validating/fixing.
-20. If `current.stage === "waiting-worker"`, overwrite `ticket-flow/current.json` to the same ticket / ticket_path but with:
-
-```json
-{
-  "version": 2,
-  "ticket": "<ticket-id>",
-  "ticket_path": ".tickets/<ticket-id>.md",
-  "stage": "waiting-validation",
-  "reason": "validation started"
-}
-```
-
-21. Run and fix using the repo's relevant validation commands.
+1. Parse the delegated handoff as required by the shared handoff skill.
+2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
+3. If a validation artifact already exists at the derived validation path and indicates `status: ready-for-review` or `status: blocked`, report that validation is already recorded and stop normally so downstream review/finalization can continue.
+4. Read the implementation artifact at the derived implementation path.
+5. If it is missing, stop and report that validation cannot proceed because implementation has not completed, then end with `<!-- CHAIN_STOP -->`.
+6. Parse the implementation artifact and verify:
+   - `ticket:` exactly matches the selected ticket
+   - `status:` is present
+7. If parsing fails, stop and report that the implementation artifact is malformed, then end with `<!-- CHAIN_STOP -->`.
+8. If the implementation artifact says `status: blocked`, report that validation is skipped because implementation is blocked, and stop normally so finalization can escalate.
+9. If the implementation artifact does not say `status: ready-for-validation`, stop and report that implementation is not validation-ready, then end with `<!-- CHAIN_STOP -->`.
+10. Read the ticket file from `ticket_path`.
+11. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while validating/fixing.
+12. Run and fix using the repo's relevant validation commands.
    - Determine commands from the repo's actual guidance (`README.md`, `pyproject.toml`, `package.json`, `Makefile`, `justfile`, CI config, etc.).
    - Prefer targeted commands first.
    - Run broader lint / typecheck / test / build commands only when they are standard for the repo or necessary to establish reviewability.
    - If broader validation fails on an unrelated issue, do **not** mutate git state to investigate; record the blocker truthfully.
    - If the worktree no longer contains the implementation described by the implementation artifact, write a blocked validation artifact and stop.
    - Fix issues until the chosen validation scope is green or you are genuinely blocked.
-22. Write exactly one validation artifact at the derived validation path.
-23. If validation is green, write `status: ready-for-review` and overwrite `ticket-flow/current.json` with:
-
-```json
-{
-  "version": 2,
-  "ticket": "<ticket-id>",
-  "ticket_path": ".tickets/<ticket-id>.md",
-  "stage": "waiting-review",
-  "reason": "validation complete"
-}
-```
-
-24. If validation is genuinely blocked, write `status: blocked` and leave `ticket-flow/current.json` at `waiting-validation`.
-25. Do not call `tk add-note`.
-26. Do not call `tk close`.
-27. End with a short summary naming the ticket id, final status, and validation artifact path.
+13. Write exactly one validation artifact at the derived validation path.
+14. If validation is green, write `status: ready-for-review`.
+15. If validation is genuinely blocked, write `status: blocked`.
+16. Do **not** overwrite `ticket-flow/current.json` or `ticket-flow/invocation.json` in this step.
+17. Do not call `tk add-note`.
+18. Do not call `tk close`.
+19. End with a short summary naming the ticket id, final status, and validation artifact path.
 
 ## Artifact contract
 
@@ -173,3 +130,4 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not broaden scope beyond what is needed to validate the selected ticket
 - Validate the current checkout only
 - Do not perform destructive or state-rewriting git operations
+- Do not read or mutate shared `ticket-flow/current.json` / `ticket-flow/invocation.json` in this delegated step

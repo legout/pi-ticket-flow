@@ -3,33 +3,33 @@ description: Internal deep ticket review pass — correctness and acceptance cri
 model: openai-codex/gpt-5.4
 subagent: reviewer
 inheritContext: false
+skill: ticket-flow-delegated-handoff
 restore: true
 ---
 Perform a deep candidate review of the currently selected ticket.
 
 This is one parallel review pass. Do not write the canonical review artifact.
 
+- Follow the shared delegated handoff skill loaded for this step.
+
 Required procedure:
-1. Read `ticket-flow/invocation.json` using `read_artifact`.
-2. Parse it as JSON and require `status: armed`, plus `ticket` and `run_token`.
-3. Read `ticket-flow/current.json` using `read_artifact`.
-4. Parse it as JSON and require matching `ticket` and present `ticket_path`.
-5. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
-6. Read the ticket file.
-7. If the ticket contains an ExecPlan Reference section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
-8. Read the implementation artifact. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
-9. Read the validation artifact. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
-10. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
-11. Inspect the current diff and relevant changed files.
-12. Focus only on:
+1. Parse the delegated handoff as required by the shared handoff skill.
+2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
+3. Read the ticket file at `ticket_path`.
+4. If the ticket contains an ExecPlan Reference section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
+5. Read the implementation artifact. If it is missing, stop and report that review cannot proceed because the implementation artifact is missing.
+6. Read the validation artifact. If it is missing, stop and report that review cannot proceed because the validation artifact is missing.
+7. If the validation artifact indicates `status: blocked`, stop and report that review cannot proceed because validation is blocked.
+8. Inspect the current diff and relevant changed files.
+9. Focus only on:
    - acceptance criteria satisfaction
    - correctness
    - logic bugs
    - concrete edge cases
-13. Do not edit code.
-14. Do not call `tk add-note`.
-15. Do not call `tk close`.
-16. Do not write the canonical review artifact.
+10. Do not edit code.
+11. Do not call `tk add-note`.
+12. Do not call `tk close`.
+13. Do not write the canonical review artifact.
 
 Output exactly this structure:
 
