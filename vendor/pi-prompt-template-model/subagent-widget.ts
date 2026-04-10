@@ -67,6 +67,18 @@ function displayName(agent: string): string {
 	return agent.charAt(0).toUpperCase() + agent.slice(1);
 }
 
+function taskPreview(task: string | undefined, maxLen = 48): string | undefined {
+	if (!task) return undefined;
+	const firstLine = task.split("\n").find((line) => line.trim())?.trim();
+	if (!firstLine) return undefined;
+	return firstLine.length > maxLen ? `${firstLine.slice(0, maxLen - 1)}…` : firstLine;
+}
+
+function formatTaskLabel(name: string | undefined, agent: string, task: string | undefined): string {
+	const label = name?.trim() || taskPreview(task) || displayName(agent);
+	return `${label} (${agent})`;
+}
+
 function formatStatus(progress: {
 	status?: string;
 	currentTool?: string;
@@ -102,24 +114,26 @@ function findTaskProgress(
 }
 
 function renderSingleWidgetLines(
+	name: string | undefined,
 	agent: string,
+	task: string | undefined,
 	state: DelegatedSubagentLiveState | undefined,
 	width: number,
 ): string[] {
 	const title = "Subagents";
 	const info = "1 running";
 	const startTime = state?.startedAt ?? Date.now();
-	const left = ` ${formatElapsedMMSS(startTime)}  ${displayName(agent)} (${agent}) `;
+	const left = ` ${formatElapsedMMSS(startTime)}  ${formatTaskLabel(name, agent, task)} `;
 	const right = formatStatus(state);
 	return [borderTop(title, info, width), borderLine(left, right, width), borderBottom(width)];
 }
 
 function renderParallelWidgetLines(
+	title: string,
 	tasks: DelegatedSubagentTask[],
 	state: DelegatedSubagentLiveState | undefined,
 	width: number,
 ): string[] {
-	const title = "Subagents";
 	const info = `${tasks.length} running`;
 	const lines = [borderTop(title, info, width)];
 	const startTime = state?.startedAt ?? Date.now();
@@ -128,7 +142,7 @@ function renderParallelWidgetLines(
 	for (let index = 0; index < tasks.length; index++) {
 		const task = tasks[index]!;
 		const progress = findTaskProgress(taskProgress, task, index);
-		const left = ` ${formatElapsedMMSS(startTime)}  ${displayName(task.agent)} (${task.agent}) `;
+		const left = ` ${formatElapsedMMSS(startTime)}  ${formatTaskLabel(task.name, task.agent, task.task)} `;
 		const right = formatStatus(progress);
 		lines.push(borderLine(left, right, width));
 	}
@@ -139,17 +153,17 @@ function renderParallelWidgetLines(
 
 export function createDelegatedProgressWidget(
 	requestId: string,
-	agent: string,
-	tasks: DelegatedSubagentTask[] | undefined,
+	request: { name?: string; agent: string; task: string; tasks?: DelegatedSubagentTask[] },
 ): DelegatedProgressWidget {
 	return {
 		invalidate() {},
 		render(width: number) {
 			const state = getDelegatedLiveState(requestId);
+			const tasks = request.tasks;
 			if (tasks && tasks.length > 0) {
-				return renderParallelWidgetLines(tasks, state, width);
+				return renderParallelWidgetLines(request.name ?? "Subagents", tasks, state, width);
 			}
-			return renderSingleWidgetLines(agent, state, width);
+			return renderSingleWidgetLines(request.name, request.agent, request.task, state, width);
 		},
 	};
 }

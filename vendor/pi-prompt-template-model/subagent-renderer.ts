@@ -18,12 +18,14 @@ interface SessionMessage {
 
 interface DelegatedDetails {
 	requestId?: string;
+	name?: string;
 	agent?: string;
 	task?: string;
 	context?: "fresh" | "fork";
 	model?: string;
 	messages?: SessionMessage[];
 	parallelResults?: Array<{
+		name?: string;
 		agent?: string;
 		messages?: SessionMessage[];
 		isError?: boolean;
@@ -112,6 +114,13 @@ function formatTokensShort(n: number): string {
 	return String(n);
 }
 
+function extractTaskPreview(task: string | undefined, maxLen = 120): string | undefined {
+	if (!task) return undefined;
+	const firstLine = task.split("\n").find((line) => line.trim())?.trim();
+	if (!firstLine) return undefined;
+	return firstLine.length > maxLen ? `${firstLine.slice(0, maxLen - 3)}...` : firstLine;
+}
+
 export function renderDelegatedSubagentResult(
 	message: { content?: unknown; details?: DelegatedDetails },
 	options: MessageRenderOptions,
@@ -120,7 +129,8 @@ export function renderDelegatedSubagentResult(
 	const details = message.details;
 	const parallelResults = details?.parallelResults ?? [];
 	const hasParallelResults = parallelResults.length > 0;
-	const agent = hasParallelResults ? "parallel" : (details?.agent ?? DEFAULT_AGENT);
+	const label = hasParallelResults ? (details?.name ?? "Parallel") : (details?.name ?? details?.agent ?? DEFAULT_AGENT);
+	const agentTag = !hasParallelResults && details?.agent ? ` (${details.agent})` : "";
 	const context = details?.context === "fork" ? theme.fg("warning", " [fork]") : "";
 	const messages = hasParallelResults
 		? parallelResults.flatMap((result) => (result.messages ?? []) as SessionMessage[])
@@ -141,12 +151,12 @@ export function renderDelegatedSubagentResult(
 	const stats = hasParallelResults
 		? `${parallelResults.length} task${parallelResults.length === 1 ? "" : "s"}, ${toolCount} tool${toolCount === 1 ? "" : "s"}, ${tokensLabel}`
 		: `${toolCount} tool${toolCount === 1 ? "" : "s"}, ${tokensLabel}`;
-	box.addChild(new Text(`${icon} ${theme.fg("toolTitle", theme.bold(agent))}${context} | ${stats}`, 0, 0));
+	box.addChild(new Text(`${icon} ${theme.fg("toolTitle", theme.bold(`${label}${agentTag}`))}${context} | ${stats}`, 0, 0));
 	box.addChild(new Spacer(1));
 
 	// Task preview
-	if (details?.task) {
-		const taskPreview = details.task.length > 120 ? `${details.task.slice(0, 120)}...` : details.task;
+	const taskPreview = extractTaskPreview(details?.task);
+	if (taskPreview) {
 		box.addChild(new Text(theme.fg("dim", `Task: ${taskPreview}`), 0, 0));
 		box.addChild(new Spacer(1));
 	}
@@ -154,8 +164,9 @@ export function renderDelegatedSubagentResult(
 	if (hasParallelResults) {
 		for (let index = 0; index < parallelResults.length; index++) {
 			const result = parallelResults[index]!;
-			const taskLabel = result.agent || `task-${index + 1}`;
-			box.addChild(new Text(theme.fg("toolTitle", `=== Task ${index + 1}: ${taskLabel} ===`), 0, 0));
+			const taskLabel = result.name ?? result.agent ?? `task-${index + 1}`;
+			const taskAgentTag = result.agent ? ` (${result.agent})` : "";
+			box.addChild(new Text(theme.fg("toolTitle", `=== Task ${index + 1}: ${taskLabel}${taskAgentTag} ===`), 0, 0));
 			const taskMessages = (result.messages ?? []) as SessionMessage[];
 			const taskText = extractAssistantText(taskMessages);
 			if (result.isError) {

@@ -249,13 +249,15 @@ Recommended workflow guidance files:
 ### Session artifacts (ephemeral)
 
 Artifacts used by the workflow:
-- `ticket-flow/invocation.md`
-- `ticket-flow/current.md`
+- `ticket-flow/invocation.json`
+- `ticket-flow/current.json`
 - `ticket-flow/<ticket-id>/implementation-<run-token>.md`
 - `ticket-flow/<ticket-id>/validation-<run-token>.md`
 - `ticket-flow/<ticket-id>/review-<run-token>.md`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
+
+`invocation.json` and `current.json` are the operational source of truth. Per-run artifact paths are derived deterministically from `ticket` + `run_token`, which reduces duplicated machine state and makes the workflow less fragile.
 
 ## Notes
 

@@ -95,4 +95,4 @@ This is repo-level validation/fix, not the ticket-specific validation step.
 /ticket-reset
 ```
 
-Use this when `ticket-flow/current.md` is malformed, stale, or points at a dead run.
+Use this when `ticket-flow/current.json` or `ticket-flow/invocation.json` is malformed, stale, or points at a dead run.

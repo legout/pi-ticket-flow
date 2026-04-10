@@ -9,7 +9,6 @@ restore: true
 Reset stale ticket-flow orchestrator state for the current session.
 
 Rules:
-
 - This command only resets orchestrator state.
 - It must **not** close tickets.
 - It must **not** reopen tickets.
@@ -18,12 +17,41 @@ Rules:
 
 Procedure:
 
-1. Try `read_artifact(name: "ticket-flow/current.md")`.
-2. Try `read_artifact(name: "ticket-flow/invocation.md")`.
-3. If both artifacts are missing, report that there is nothing to reset and stop.
-4. If `ticket-flow/current.md` exists, briefly summarize the current `ticket` and `stage` from the artifact.
-5. If `ticket-flow/invocation.md` exists, briefly summarize the current `status`, `mode`, and `ticket` from the artifact.
-6. Overwrite `ticket-flow/current.md` with this tombstone format:
+1. Try `read_artifact(name: "ticket-flow/current.json")`.
+2. Try `read_artifact(name: "ticket-flow/invocation.json")`.
+3. Also try `read_artifact(name: "ticket-flow/current.md")` and `read_artifact(name: "ticket-flow/invocation.md")` only as a legacy cleanup check.
+4. If all four artifacts are missing, report that there is nothing to reset and stop.
+5. If `ticket-flow/current.json` exists, briefly summarize its `ticket` and `stage`.
+6. If `ticket-flow/invocation.json` exists, briefly summarize its `status`, `mode`, and `ticket`.
+7. If legacy markdown state exists, mention that legacy state was also found and will be cleared.
+8. Overwrite `ticket-flow/current.json` with:
+
+```json
+{
+  "version": 2,
+  "ticket": null,
+  "ticket_path": null,
+  "stage": "done",
+  "reason": "manual reset via /ticket-reset"
+}
+```
+
+9. Overwrite `ticket-flow/invocation.json` with:
+
+```json
+{
+  "version": 2,
+  "status": "blocked",
+  "mode": "single",
+  "ticket": null,
+  "run_token": null,
+  "reason": "manual reset via /ticket-reset"
+}
+```
+
+10. If legacy markdown state exists, overwrite it with these safe tombstones so old sessions cannot confuse future runs.
+
+Legacy `ticket-flow/current.md`:
 
 ```md
 ticket: reset
@@ -35,7 +63,7 @@ review_artifact: none
 reason: manual reset via /ticket-reset
 ```
 
-7. Overwrite `ticket-flow/invocation.md` with this blocked sentinel format:
+Legacy `ticket-flow/invocation.md`:
 
 ```md
 status: blocked
@@ -44,6 +72,4 @@ ticket: none
 run_token: none
 reason: manual reset via /ticket-reset
 ```
-
-8. Report that orchestrator state was reset successfully.
-9. Stop.
+11. Report that orchestrator state was reset successfully.

@@ -12,6 +12,7 @@ export const PROMPT_TEMPLATE_SUBAGENT_MESSAGE_TYPE = "prompt-template-subagent";
 export const DEFAULT_SUBAGENT_NAME = "delegate";
 
 export interface DelegatedSubagentTask {
+	name?: string;
 	agent: string;
 	task: string;
 	model?: string;
@@ -20,6 +21,7 @@ export interface DelegatedSubagentTask {
 }
 
 export interface DelegatedSubagentParallelResult {
+	name?: string;
 	agent: string;
 	messages: unknown[];
 	isError: boolean;
@@ -28,6 +30,7 @@ export interface DelegatedSubagentParallelResult {
 
 export interface DelegatedSubagentRequest {
 	requestId: string;
+	name?: string;
 	agent: string;
 	task: string;
 	tasks?: DelegatedSubagentTask[];
@@ -40,6 +43,7 @@ export interface DelegatedSubagentRequest {
 
 export interface DelegatedSubagentResponse {
 	requestId: string;
+	name?: string;
 	context: "fresh" | "fork";
 	model: string;
 	messages: unknown[];

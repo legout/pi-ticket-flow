@@ -38,7 +38,7 @@ Also note:
 
 If behavior looks wrong, inspect the active agent file and run `/reload`.
 
-## `ticket-flow/current.md` is stale or malformed
+## `ticket-flow/current.json` or `ticket-flow/invocation.json` is stale or malformed
 
 Run:
 
@@ -46,7 +46,9 @@ Run:
 /ticket-reset
 ```
 
-This writes a tombstone `ticket-flow/current.md` state and blocks `ticket-flow/invocation.md` so the next run can start cleanly.
+This writes a safe JSON tombstone to `ticket-flow/current.json` and a blocked sentinel to `ticket-flow/invocation.json` so the next run can start cleanly.
+
+`/ticket-reset` also clears legacy markdown state files (`ticket-flow/current.md` and `ticket-flow/invocation.md`) if they still exist from older workflow versions.
 
 If `/ticket-queue` stops immediately because it found unfinished or malformed orchestrator state, that is intentional — fix the stale state with `/ticket-reset` before retrying the queue.
 
@@ -56,8 +58,8 @@ Transient delegated-provider overloads (`429`, `temporarily overloaded`, rate-li
 
 Inspect:
 
-- `ticket-flow/invocation.md`
-- `ticket-flow/current.md`
+- `ticket-flow/invocation.json`
+- `ticket-flow/current.json`
 - the referenced implementation, validation, and review artifacts
 
 Common causes:
@@ -65,17 +67,18 @@ Common causes:
 - implementation artifact is `blocked`
 - validation artifact is missing or not `ready-for-review`
 - the invocation guard is still `blocked`
-- `current.md` stage does not match the artifact state
+- `current.json` stage does not match the artifact state
+- the implementation artifact no longer matches the actual worktree
 
 ## Queue finishes immediately
 
 Possible causes:
 
 - `tk ready` has no eligible tickets
+- all ready tickets are escalated, blocked by dependencies, or otherwise ineligible
 - the queue was already completed in this session
-- ticket dependencies or statuses prevent scheduling
 
-Check `ticket-flow/progress.md` and the `.tickets/` statuses.
+Check `ticket-flow/progress.md`, `tk ready`, and the `.tickets/` statuses.
 
 ## `tk-ui` fails to launch
 

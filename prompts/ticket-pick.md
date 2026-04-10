@@ -1,5 +1,5 @@
 ---
-description: Pick exactly one eligible tk ticket and initialize ticket-flow/current.md
+description: Pick exactly one eligible tk ticket and initialize simplified ticket-flow state
 model: zai/glm-5-turbo, minimax/MiniMax-M2.7
 thinking: minimal
 skill: ticket-flow
@@ -14,35 +14,49 @@ Rules:
 - It must not spawn subagents.
 - It must not implement code.
 - It must not close tickets.
-- It initializes new work only; it does not resume unfinished `ticket-flow/current.md` state.
+- It initializes new work only; it does not resume unfinished state.
+- Use the deterministic helper tools exposed by this package for candidate selection and run-token generation.
 
 If this procedure ends **without** selecting a ticket, end your response with the exact final line:
 
 `<!-- CHAIN_STOP -->`
 
-That marker tells the parent prompt chain not to continue into implementation, validation, review, or finalization steps.
+## State files
+
+Machine state now lives in JSON session artifacts:
+- `ticket-flow/invocation.json`
+- `ticket-flow/current.json`
+
+Legacy markdown state files may still exist from older runs:
+- `ticket-flow/invocation.md`
+- `ticket-flow/current.md`
+
+If legacy state exists, stop and tell the user to run `/ticket-reset` so the session can be migrated cleanly.
 
 ## Invocation mode
 
 Interpret the first argument exactly:
 
-- `queue` → this is a **queue run**
-- empty → this is a **single-ticket run**
-- anything else → overwrite `ticket-flow/invocation.md` with a blocked sentinel, then stop and report an invalid invocation mode hint
+- `queue` → queue run
+- empty → single-ticket run
+- anything else → invalid
 
-Before doing any ticket selection work, overwrite `ticket-flow/invocation.md` with:
+Before doing selection work, overwrite `ticket-flow/invocation.json` with this blocked sentinel:
 
-```md
-status: blocked
-mode: <queue|single>
-ticket: none
-run_token: none
-reason: selection not completed
+```json
+{
+  "version": 2,
+  "status": "blocked",
+  "mode": "single or queue",
+  "ticket": null,
+  "run_token": null,
+  "reason": "selection not completed"
+}
 ```
 
-### Queue-only initialization (only when `ticket-flow/progress.md` is missing but this is a queue run)
+## Queue-only initialization
 
-If `ticket-flow/progress.md` is missing during a queue run, create it:
+If this is a queue run and `ticket-flow/progress.md` is missing, create:
 
 ```md
 # Ticket Queue Progress
@@ -51,6 +65,7 @@ status: running
 started_at: <ISO-8601>
 last_updated: <ISO-8601>
 current_ticket: none
+current_run_token: none
 completed_tickets: 0
 pass_count: 0
 revise_count: 0
@@ -61,7 +76,7 @@ blocked_count: 0
 - none yet
 ```
 
-If `ticket-flow/lessons-learned.md` is missing during a queue run, create it:
+If this is a queue run and `ticket-flow/lessons-learned.md` is missing, create:
 
 ```md
 # Ticket Queue Lessons Learned
@@ -74,79 +89,69 @@ Add only durable, reusable lessons learned from implementing tickets.
 
 ## Procedure
 
-1. Interpret `$1` as the invocation mode hint.
-2. If the hint is `queue`, set mode to queue. If the hint is empty, set mode to single. Otherwise overwrite `ticket-flow/invocation.md` with `status: blocked`, `mode: single`, `ticket: none`, `run_token: none`, and `reason: invalid invocation mode hint`, then stop and report an invalid invocation mode hint.
-3. Overwrite `ticket-flow/invocation.md` with:
+1. Interpret `$1` as the mode hint.
+2. If it is `queue`, mode = `queue`.
+3. If it is empty, mode = `single`.
+4. Otherwise write blocked `ticket-flow/invocation.json` with `mode: "single"` and `reason: "invalid invocation mode hint"`, report the invalid hint, and stop.
+5. Overwrite `ticket-flow/invocation.json` with blocked sentinel state for the chosen mode.
+6. Try `read_artifact(name: "ticket-flow/current.json")`.
+7. If `ticket-flow/current.json` exists, parse it as JSON. Required keys:
+   - `version`
+   - `ticket`
+   - `ticket_path`
+   - `stage`
+   - optional `reason`
+8. If `ticket-flow/current.json` is malformed, keep invocation blocked, report malformed state, and tell the user to run `/ticket-reset`.
+   - In queue mode, call `signal_loop_success` before stopping so the queue does not spin on broken state.
+9. If `ticket-flow/current.json` exists and `stage` is not `done`, keep invocation blocked, report unfinished orchestrator state, and stop.
+   - In queue mode, call `signal_loop_success` before stopping so the queue does not spin uselessly.
+10. If `ticket-flow/current.json` is missing, try `read_artifact(name: "ticket-flow/current.md")` and `read_artifact(name: "ticket-flow/invocation.md")` only as a legacy check.
+11. If either legacy markdown state artifact exists, keep invocation blocked, report that legacy state is present, and tell the user to run `/ticket-reset`.
+   - In queue mode, call `signal_loop_success` before stopping so the queue does not spin on legacy state.
+12. In queue mode, create `ticket-flow/progress.md` and/or `ticket-flow/lessons-learned.md` if missing.
+13. Call `ticket_flow_select`.
+14. Parse its JSON output.
+15. If helper returns `outcome: "none-ready"`:
+    - **Queue mode:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`, `current_run_token: none`; write blocked `ticket-flow/invocation.json` with `reason: "queue complete"`; write `ticket-flow/current.json` tombstone with `ticket: null`, `ticket_path: null`, `stage: "done"`, and `reason: "queue complete"`; call `signal_loop_success`; stop.
+    - **Single mode:** report that there are no ready tickets and stop.
+16. If helper returns `outcome: "no-eligible"`:
+    - **Queue mode:** same completion path as step 15 queue mode.
+    - **Single mode:** report that all ready tickets are escalated, dependency-blocked, or otherwise ineligible, and stop.
+17. If helper returns `outcome: "selected"`, extract:
+    - `selected.ticket`
+    - `selected.ticketPath`
+    - `selected.currentStatus`
+18. If no ticket path is available, stop and report that the ticket file could not be located.
+19. If `selected.currentStatus` is not `in_progress`, run `tk start <ticket>`.
+20. Call `ticket_flow_new_run_token`.
+21. Write `ticket-flow/current.json`:
 
-```md
-status: blocked
-mode: <queue|single>
-ticket: none
-run_token: none
-reason: selection not completed
+```json
+{
+  "version": 2,
+  "ticket": "<ticket-id>",
+  "ticket_path": ".tickets/<ticket-id>.md",
+  "stage": "waiting-worker",
+  "reason": "selected ticket"
+}
 ```
 
-4. Try `read_artifact(name: "ticket-flow/current.md")`.
-5. If `ticket-flow/current.md` exists, parse it using exact single-occurrence line prefixes:
-   - `ticket:`
-   - `ticket_path:`
-   - `stage:`
-   - `implementation_artifact:`
-   - `validation_artifact:`
-   - `review_artifact:`
-   - optional tombstone line: `reason:`
-6. If parsing fails:
-   - overwrite `ticket-flow/invocation.md` with `status: blocked`, `mode: <queue|single>`, `ticket: none`, `run_token: none`, and `reason: malformed current state`
-   - **Queue run only:** call `signal_loop_success` so this queue invocation stops instead of looping uselessly on broken state
-   - stop and tell the user to run `/ticket-reset`.
-7. If `ticket-flow/current.md` exists and its `stage` is not `done`:
-   - overwrite `ticket-flow/invocation.md` with `status: blocked`, `mode: <queue|single>`, `ticket: <ticket from current.md>`, `run_token: none`, and `reason: unfinished orchestrator state`
-   - **Queue run only:** call `signal_loop_success` so this queue invocation stops instead of repeating on stale state
-   - stop and report that there is already unfinished orchestrator state.
-   - Tell the user to use `/ticket-reset` to clear stale state and retry.
-8. If this is a queue run and `ticket-flow/progress.md` is missing, create it using the queue progress template above.
-9. If this is a queue run and `ticket-flow/lessons-learned.md` is missing, create it using the lessons-learned template above.
-10. Run `tk ready`.
-11. If no ready tickets exist:
-   - **Queue run:** update `ticket-flow/progress.md` to `status: done`, `last_updated: <now>`, `current_ticket: none`. Overwrite `ticket-flow/invocation.md` with `status: blocked`, `mode: queue`, `ticket: none`, `run_token: none`, and `reason: queue complete`. Write a queue-complete tombstone to `ticket-flow/current.md` with `ticket: none`, `ticket_path: none`, `stage: done`, `implementation_artifact: none`, `validation_artifact: none`, `review_artifact: none`, and `reason: queue complete`. Call `signal_loop_success`. Stop.
-   - **Single-ticket run:** report that there are no ready tickets and stop.
-12. Inspect candidates in listed order:
-   - prefer tickets already marked `[in_progress]`
-   - then consider the remaining ready tickets
-13. For each candidate, inspect `tk show <ticket-id>`.
-   - If the Notes section contains `Gate: ESCALATE`, skip that ticket.
-   - If the ticket is `type: epic`, skip that ticket.
-   - If the Children section contains any child marked `[open]` or `[in_progress]`, skip that ticket.
-   - Automatic ticket-flow selection should target **leaf tickets** only.
-14. Pick the first eligible leaf ticket.
-15. If no eligible ticket remains:
-    - **Queue run:** same as step 11 queue path (progress → invocation blocked with `reason: queue complete` → tombstone including `validation_artifact: none` → `signal_loop_success` → stop).
-    - **Single-ticket run:** report that all ready tickets are escalated or ineligible and stop.
-16. If the chosen ticket is not already `in_progress`, run `tk start <ticket-id>`.
-17. Generate a unique `<run-token>` for this ticket-flow attempt (for example an ISO-8601 UTC timestamp without punctuation, or another short unique token) and use the same token in all three artifact filenames below.
-18. Write `ticket-flow/current.md` with:
+22. Overwrite `ticket-flow/invocation.json`:
 
-```md
-ticket: <ticket-id>
-ticket_path: .tickets/<ticket-id>.md
-stage: waiting-worker
-implementation_artifact: ticket-flow/<ticket-id>/implementation-<run-token>.md
-validation_artifact: ticket-flow/<ticket-id>/validation-<run-token>.md
-review_artifact: ticket-flow/<ticket-id>/review-<run-token>.md
+```json
+{
+  "version": 2,
+  "status": "armed",
+  "mode": "<single|queue>",
+  "ticket": "<ticket-id>",
+  "run_token": "<run-token>",
+  "reason": "selected ticket"
+}
 ```
 
-19. Overwrite `ticket-flow/invocation.md` with:
-
-```md
-status: armed
-mode: <queue|single>
-ticket: <ticket-id>
-run_token: <run-token>
-reason: selected ticket
-```
-
-20. **Queue run only:** update `ticket-flow/progress.md` by preserving the existing counters/history but setting:
+23. **Queue mode only:** update `ticket-flow/progress.md` to set:
     - `status: running`
     - `last_updated: <now>`
     - `current_ticket: <ticket-id>`
-21. End with a short summary including the selected ticket id.
+    - `current_run_token: <run-token>`
+24. End with a short summary including the selected ticket id and run token.

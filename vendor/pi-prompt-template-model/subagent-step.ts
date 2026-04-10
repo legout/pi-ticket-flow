@@ -110,6 +110,7 @@ function coerceMessages(messages: unknown[]): Message[] {
 }
 
 function coerceParallelResults(parallelResults: DelegatedSubagentParallelResult[] | undefined): Array<{
+	name?: string;
 	agent: string;
 	messages: Message[];
 	isError: boolean;
@@ -117,6 +118,7 @@ function coerceParallelResults(parallelResults: DelegatedSubagentParallelResult[
 }> {
 	if (!Array.isArray(parallelResults)) return [];
 	return parallelResults.map((result) => ({
+		name: result.name,
 		agent: result.agent,
 		messages: coerceMessages(result.messages),
 		isError: result.isError === true,
@@ -126,6 +128,7 @@ function coerceParallelResults(parallelResults: DelegatedSubagentParallelResult[
 
 function renderParallelDelegatedText(
 	results: Array<{
+		name?: string;
 		agent: string;
 		messages: Message[];
 	}>,
@@ -134,9 +137,88 @@ function renderParallelDelegatedText(
 		.map((result, index) => {
 			const text = extractDelegatedText(result.messages);
 			const body = text || "(no assistant text)";
-			return `=== Task ${index + 1}: ${result.agent} ===\n${body}`;
+			return `=== Task ${index + 1}: ${result.name ?? result.agent} (${result.agent}) ===\n${body}`;
 		})
 		.join("\n\n");
+}
+
+function titleCaseWords(value: string): string {
+	return value
+		.split(/[-_\s]+/)
+		.map((part) => part.trim())
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ");
+}
+
+function extractTicketId(taskText: string): string | undefined {
+	const patterns = [
+		/\.tickets\/([^/\s]+)\.md/,
+		/ticket-flow\/([^/\s]+)\//,
+		/^ticket:\s*([^\s]+)\s*$/m,
+		/\btk show\s+([^\s`]+)/,
+	];
+
+	for (const pattern of patterns) {
+		const match = taskText.match(pattern);
+		const value = match?.[1]?.trim();
+		if (value && value !== "<ticket-id>" && value !== "none") return value;
+	}
+
+	return undefined;
+}
+
+function deriveDelegatedTaskName(promptName: string, agent: string, taskText: string): string {
+	const normalized = promptName.trim().toLowerCase();
+	const ticketId = extractTicketId(taskText);
+	const withTicket = (label: string) => ticketId ? `${label} ${ticketId}` : label;
+
+	if (normalized.includes("implement")) return withTicket("Implementation");
+	if (normalized.includes("test-fix") || normalized.includes("validate") || normalized.includes("validation")) {
+		return withTicket("Validation");
+	}
+	if (normalized.includes("correctness")) return withTicket("Correctness Review");
+	if (normalized.includes("regression")) return withTicket("Regression Review");
+	if (normalized.includes("deep-tests") || normalized.endsWith("-tests") || normalized.includes(" tests")) {
+		return withTicket("Test Review");
+	}
+	if (normalized.includes("review")) return withTicket("Review");
+
+	const stripped = normalized
+		.replace(/^ticket-/, "")
+		.replace(/^review-/, "")
+		.replace(/^prompt-/, "");
+	const titled = titleCaseWords(stripped);
+	return withTicket(titled || (agent.charAt(0).toUpperCase() + agent.slice(1)));
+}
+
+function commonTicketId(preparedTasks: PreparedDelegatedTask[]): string | undefined {
+	const ids = [...new Set(preparedTasks.map((task) => extractTicketId(task.task)).filter(Boolean))];
+	return ids.length === 1 ? ids[0] : undefined;
+}
+
+function deriveParallelRequestName(preparedTasks: PreparedDelegatedTask[]): string | undefined {
+	if (preparedTasks.length === 0) return undefined;
+	const ticketId = commonTicketId(preparedTasks);
+	const withTicket = (label: string) => ticketId ? `${label} ${ticketId}` : label;
+	const promptNames = preparedTasks.map((task) => task.promptName.trim().toLowerCase());
+
+	if (
+		preparedTasks.length >= 3 &&
+		promptNames.every((name) => name.includes("review")) &&
+		promptNames.some((name) => name.includes("correctness")) &&
+		promptNames.some((name) => name.includes("regression")) &&
+		promptNames.some((name) => name.includes("tests"))
+	) {
+		return withTicket("Deep Review");
+	}
+
+	if (promptNames.every((name) => name.includes("review"))) return withTicket("Parallel Review");
+	if (promptNames.every((name) => name.includes("validate") || name.includes("validation") || name.includes("test-fix"))) {
+		return withTicket("Parallel Validation");
+	}
+
+	return withTicket("Parallel Tasks");
 }
 
 function resolveDelegationName(prompt: PromptWithModel, override?: SubagentOverride): string | undefined {
@@ -150,6 +232,7 @@ function resolveDelegationName(prompt: PromptWithModel, override?: SubagentOverr
 
 interface PreparedDelegatedTask {
 	promptName: string;
+	name: string;
 	agent: string;
 	task: string;
 	context: "fresh" | "fork";
@@ -204,6 +287,7 @@ async function prepareDelegatedTask(
 
 	return {
 		promptName: task.prompt.name,
+		name: deriveDelegatedTaskName(task.prompt.name, agent, taskText),
 		agent,
 		task: taskText,
 		context: task.prompt.inheritContext ? "fork" : "fresh",
@@ -220,11 +304,13 @@ function buildDelegatedRequest(
 ): DelegatedSubagentRequest {
 	return {
 		requestId: randomUUID(),
+		name: isParallelRequest ? deriveParallelRequestName(preparedTasks) : preparedTasks[0]!.name,
 		agent: preparedTasks[0]!.agent,
 		task: preparedTasks[0]!.task,
 		...(isParallelRequest
 			? {
 				tasks: preparedTasks.map<DelegatedSubagentTask>((task) => ({
+					name: task.name,
 					agent: task.agent,
 					task: task.task,
 					model: task.model,
@@ -411,7 +497,7 @@ async function requestDelegatedRun(
 			widgetSet = true;
 			ctx.ui.setWidget(
 				DELEGATED_WIDGET_KEY,
-				() => createDelegatedProgressWidget(request.requestId, request.agent, request.tasks),
+				() => createDelegatedProgressWidget(request.requestId, request),
 				{ placement: "aboveEditor" },
 			);
 			// Force TUI repaints every second so the elapsed timer ticks during idle periods
@@ -611,7 +697,9 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 
 			const request = buildDelegatedRequest(preparedTasks, isParallelRequest);
 			const promptLabel = preparedTasks.map((task) => task.promptName).join(", ");
-			const statusLabel = isParallelRequest ? `parallel(${preparedTasks.length})` : preparedTasks[0]!.agent;
+			const statusLabel = isParallelRequest
+				? (request.name ?? preparedTasks.map((task) => `${task.name} (${task.agent})`).join(", "))
+				: `${preparedTasks[0]!.name} (${preparedTasks[0]!.agent})`;
 			if (ctx.hasUI) {
 				ctx.ui.setStatus("prompt-subagent", `delegating to ${statusLabel}`);
 				ctx.ui.setWorkingMessage(
@@ -624,8 +712,8 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 				notify(
 					ctx,
 					isParallelRequest
-						? `Delegating parallel prompts (${promptLabel})`
-						: `Delegating prompt \`${preparedTasks[0]!.promptName}\` to subagent \`${preparedTasks[0]!.agent}\``,
+						? `Delegating parallel prompts (${request.name ?? promptLabel})`
+						: `Delegating prompt \`${preparedTasks[0]!.promptName}\` to subagent \`${preparedTasks[0]!.name} (${preparedTasks[0]!.agent})\``,
 					"info",
 				);
 			}
@@ -658,6 +746,7 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 						display: true,
 						details: {
 							requestId: response.requestId,
+							name: request.name,
 							agent: request.agent,
 							task: preparedTasks.map((task) => task.task).join("\n\n"),
 							context: response.context,
@@ -687,6 +776,7 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 					display: true,
 					details: {
 						requestId: response.requestId,
+						name: preparedTasks[0]!.name,
 						agent: preparedTasks[0]!.agent,
 						task: request.task,
 						context: response.context,

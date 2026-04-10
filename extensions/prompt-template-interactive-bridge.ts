@@ -35,6 +35,7 @@ const CANCEL_EVENT = "prompt-template:subagent:cancel";
 const SPAWNING_TOOLS = ["subagent", "subagents_list", "subagent_resume"];
 
 interface DelegatedSubagentTask {
+  name?: string;
   agent: string;
   task: string;
   model?: string;
@@ -44,6 +45,7 @@ interface DelegatedSubagentTask {
 
 interface DelegatedSubagentRequest {
   requestId: string;
+  name?: string;
   agent: string;
   task: string;
   tasks?: DelegatedSubagentTask[];
@@ -56,10 +58,12 @@ interface DelegatedSubagentRequest {
 
 interface DelegatedSubagentResponse {
   requestId: string;
+  name?: string;
   context: "fresh" | "fork";
   model: string;
   messages: unknown[];
   parallelResults?: Array<{
+    name?: string;
     agent: string;
     messages: unknown[];
     isError: boolean;
@@ -111,6 +115,7 @@ interface AgentDefaults {
 
 interface RunningTask {
   index: number;
+  name?: string;
   agent: string;
   model: string;
   surface: string;
@@ -135,6 +140,7 @@ interface TaskProgressSnapshot {
 }
 
 interface TaskResult {
+  name?: string;
   agent: string;
   messages: unknown[];
   isError: boolean;
@@ -470,10 +476,12 @@ async function launchTask(
   let forkCleanupFile: string | undefined;
   let taskArtifactPath: string | undefined;
   let baselineEntryCount = 0;
+  const taskLabel = taskReq.name?.trim() || taskReq.agent;
+  const surfaceLabel = request.tasks && request.tasks.length > 1 ? `${taskLabel} ${index + 1}` : taskLabel;
 
   try {
     throwIfAborted(abortController);
-    surface = createSurface(`${taskReq.agent}:${index + 1}`);
+    surface = createSurface(surfaceLabel);
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     throwIfAborted(abortController);
 
@@ -527,7 +535,7 @@ async function launchTask(
     if (deniedTools.length > 0) {
       envParts.push(`PI_DENY_TOOLS=${shellEscape(deniedTools.join(","))}`);
     }
-    envParts.push(`PI_SUBAGENT_NAME=${shellEscape(taskReq.agent)}`);
+    envParts.push(`PI_SUBAGENT_NAME=${shellEscape(taskLabel)}`);
     envParts.push(`PI_SUBAGENT_AGENT=${shellEscape(taskReq.agent)}`);
     if (agentDefs.autoExit) envParts.push("PI_SUBAGENT_AUTO_EXIT=1");
 
@@ -547,6 +555,7 @@ async function launchTask(
 
     return {
       index,
+      name: taskReq.name,
       agent: taskReq.agent,
       model: effectiveModel,
       surface,
@@ -634,6 +643,7 @@ async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgress
     cleanupTask(task);
 
     return {
+      name: task.name,
       agent: task.agent,
       messages,
       isError: outcome.isError,
@@ -647,6 +657,7 @@ async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgress
         ? error.message
         : String(error);
     return {
+      name: task.name,
       agent: task.agent,
       messages: ensureAssistantSummary([], message),
       isError: true,
@@ -662,6 +673,7 @@ async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagent
     const task = await launchTask(
       pi,
       {
+        name: request.name,
         agent: request.agent,
         task: request.task,
         model: request.model,
@@ -691,6 +703,7 @@ async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagent
 
     const response: DelegatedSubagentResponse = {
       requestId: request.requestId,
+      name: result.name,
       context: request.context,
       model: request.model,
       messages: result.messages,
@@ -769,6 +782,7 @@ async function processParallelRequest(pi: ExtensionAPI, request: DelegatedSubage
     const failures = results.filter((result) => result.isError);
     const response: DelegatedSubagentResponse = {
       requestId: request.requestId,
+      name: request.name,
       context: request.context,
       model: request.model,
       messages: [],

@@ -1,11 +1,12 @@
 ---
 name: ticket-flow
-description: Orchestrate exactly one tk ticket end-to-end with fresh worker and reviewer subagents, using artifacts for durable handoff state.
+description: Orchestrate exactly one tk ticket end-to-end with fresh worker and reviewer subagents, using JSON state artifacts for durable handoff.
 ---
 
 # Ticket Flow One-Ticket Orchestrator
 
 This skill implements **exactly one ticket** per invocation.
+
 It is designed for use with:
 - `pi-prompt-template-model` for prompt frontmatter (`model`, `skill`, `restore`)
 - `pi-interactive-subagents` for fresh worker/reviewer sessions and artifact handoff
@@ -14,289 +15,160 @@ It is designed for use with:
 
 For one ticket only:
 1. pick a ticket
-2. gather context
-3. implement
-4. hand off to a separate validation/fix step
-5. keep validation green before review
-6. perform a critical audit review
-7. close on PASS, retry on REVISE up to a limit, then escalate
+2. implement it
+3. validate/fix it in the current checkout
+4. review it critically
+5. finalize to PASS / REVISE / ESCALATE / BLOCKED
 
-## Important clarification
+## Simplified workflow model
 
 The shipped `/ticket-flow` and `/ticket-queue` commands are **linear prompt chains with explicit early-stop control**.
-They do not act as a generic resumable orchestrator entrypoint.
-In particular:
 
-- `ticket-pick` initializes new work only when `ticket-flow/current.md` is absent or already `done`
-- the later internal prompts (`ticket-mark-validation`, `ticket-test-fix`, `ticket-mark-review`, `ticket-review`, `ticket-finalize`) advance the selected ticket through the chain
-- when a step determines downstream work must not continue, it should end with the exact marker `<!-- CHAIN_STOP -->` so the prompt chain halts cleanly
-- if a run stops mid-flight, do not pretend `/ticket-pick` can safely resume it
+Current simplified chain:
 
-## Hard Rules
+- `ticket-pick`
+- `ticket-implement`
+- `ticket-test-fix`
+- `ticket-review`
+- `ticket-finalize`
+
+`ticket-mark-validation` and `ticket-mark-review` are deprecated compatibility shims. Stage advancement now happens inside validation.
+
+## Hard rules
 
 1. **One ticket only.** Never start or review multiple tickets in one invocation.
 2. **No parallel ticket execution.** Do not start a second ticket while one is active.
 3. **Fresh subagents only.** Worker and reviewer must run with fresh context (`fork: false`).
-4. **Main session is the orchestrator only.** It may read files, call `tk`, spawn subagents, read artifacts, and finalize ticket state. It should not implement product code itself or run the validation/fix loop itself.
-5. **Use artifacts as the source of truth.** Do not rely on memory alone.
-6. **Parse orchestrator state strictly.** `ticket-flow/current.md` must contain exactly one line for each required key: `ticket:`, `ticket_path:`, `stage:`, `implementation_artifact:`, `validation_artifact:`, `review_artifact:`. Tombstones may also include at most one optional `reason:` line. If malformed, stop and ask for `/ticket-reset`.
-7. **Do not repeat duplicate work.** If a stage is already waiting on a worker/reviewer artifact and the artifact is still missing, stop and wait; keep the invocation guard blocked so any later linear-chain steps no-op.
-8. **Only close on PASS.** If review is REVISE, add notes and leave the ticket `in_progress`.
-9. **Max failed reviews per ticket: 3.** On the 3rd failed review, add an escalation note instead of retrying again.
-10. **Skip escalated tickets during selection.** Any ticket whose notes already contain `Gate: ESCALATE` is not eligible for automatic processing.
-11. **Select leaf tickets only.** Automatic selection must skip epics and any parent ticket whose children still include `[open]` or `[in_progress]` entries.
-12. **Blocked implementation escalates immediately.** If the worker artifact says `status: blocked`, do not advance to validation or review; let finalization escalate directly from the implementation artifact and mark orchestrator state done.
+4. **Use artifacts as the source of truth.** Do not rely on conversational memory alone.
+5. **Use structured machine state.** The operational state files are JSON, not freeform markdown.
+6. **Validate the current checkout only.** Do not use git rewinds/stash tricks to classify failures.
+7. **Skip escalated tickets automatically.** Any ticket whose notes contain `Gate: ESCALATE` is not eligible.
+8. **Select leaf tickets only.** Automatic selection must skip epics and parents with open/in-progress children.
+9. **Respect dependencies.** Automatic selection must skip tickets whose listed dependencies are not closed.
+10. **Only close on PASS.** If review is REVISE, leave the ticket `in_progress`.
+11. **Max failed reviews per ticket: 3.** On the 3rd failed review, escalate instead of retrying again.
+12. **Blocked implementation or validation escalates immediately in finalization.**
 
-## Durable Artifact Contract
+## Durable artifact contract
 
-Use these artifact paths:
+### Machine state (JSON session artifacts)
 
-- `ticket-flow/invocation.md` — per-invocation guard written by `ticket-pick`; downstream chain steps must require `status: armed`
-- `ticket-flow/current.md` — orchestrator state for the current ticket
-- `ticket-flow/<ticket-id>/implementation-<run-token>.md` — implementation worker output for one ticket-flow attempt
-- `ticket-flow/<ticket-id>/validation-<run-token>.md` — validation worker output for the same attempt
-- `ticket-flow/<ticket-id>/review-<run-token>.md` — reviewer output for the same attempt
-- `ticket-flow/progress.md` — queue progress and ticket history
-- `ticket-flow/lessons-learned.md` — reusable lessons learned across tickets
+- `ticket-flow/invocation.json` — per-invocation guard
+- `ticket-flow/current.json` — current orchestrator state
+
+### Evidence artifacts (markdown session artifacts)
+
+- `ticket-flow/<ticket-id>/implementation-<run-token>.md`
+- `ticket-flow/<ticket-id>/validation-<run-token>.md`
+- `ticket-flow/<ticket-id>/review-<run-token>.md`
+- `ticket-flow/progress.md`
+- `ticket-flow/lessons-learned.md`
 
 These are **session artifact names**, not repository-relative files.
 
 - Read them with `read_artifact(name: ...)`
 - Write them with `write_artifact(name: ...)`
-- Never use `read`, `write`, `edit`, or shell redirection on repo-root `ticket-flow/...` paths for orchestrator state
+- Never use repo-root `ticket-flow/...` files as workflow state
 
-If the target repository also has a checked-in `ticket-flow/` directory, treat that as unrelated project data; it is **not** the ticket-flow session state for this workflow.
+### `ticket-flow/invocation.json`
 
-### `ticket-flow/current.md` format
+Use this shape:
 
-Use this format exactly for active runs. Tombstones may also append an optional `reason:` line.
-
-```md
-ticket: <ticket-id>
-ticket_path: .tickets/<ticket-id>.md
-stage: waiting-worker | waiting-validation | waiting-review | done
-implementation_artifact: ticket-flow/<ticket-id>/implementation-<run-token>.md
-validation_artifact: ticket-flow/<ticket-id>/validation-<run-token>.md
-review_artifact: ticket-flow/<ticket-id>/review-<run-token>.md
+```json
+{
+  "version": 2,
+  "status": "armed or blocked",
+  "mode": "single or queue",
+  "ticket": "flo-1234 or null",
+  "run_token": "20260410T165200Z or null",
+  "reason": "short explanation"
+}
 ```
 
-### `ticket-flow/invocation.md` format
+### `ticket-flow/current.json`
 
-`ticket-pick` must overwrite this artifact at the start of every `/ticket-flow` or `/ticket-queue` invocation so downstream steps can tell whether the current linear chain is armed to proceed for the current ticket-flow attempt.
+Use this shape:
 
-```md
-status: armed | blocked
-mode: single | queue
-ticket: <ticket-id> | none
-run_token: <run-token> | none
-reason: <short explanation>
+```json
+{
+  "version": 2,
+  "ticket": "flo-1234 or null",
+  "ticket_path": ".tickets/flo-1234.md or null",
+  "stage": "waiting-worker | waiting-validation | waiting-review | done",
+  "reason": "short explanation"
+}
 ```
 
-## Stage Machine
+### Deterministic helper
 
-### Stage A — Interpreting existing orchestrator state
+Use the deterministic helper tools exposed by this package:
 
-The shipped `/ticket-flow` and `/ticket-queue` entrypoints use `ticket-pick` as a gate, not as a resumable orchestrator brain.
+- `ticket_flow_select`
+- `ticket_flow_check_ticket`
+- `ticket_flow_new_run_token`
+- `ticket_flow_artifact_paths`
 
-At the start of every invocation:
+Use it for:
+- candidate selection
+- dependency / leaf / escalation checks
+- artifact path derivation
+- run-token generation
 
-1. `ticket-pick` must overwrite `ticket-flow/invocation.md` to `status: blocked` before reading any prior state.
-2. Try `read_artifact(name: "ticket-flow/current.md")`.
-3. Parse the artifact strictly.
-   - If it is malformed, block `ticket-flow/invocation.md`, tell the user to run `/ticket-reset`, and stop.
-   - During a queue run, also stop the current queue invocation so it does not spin on broken state.
-4. If it exists and `stage` is not `done`, report that there is unfinished orchestrator state and stop.
-   - Leave `ticket-flow/invocation.md` blocked so downstream linear-chain steps no-op instead of duplicating work.
-   - During a queue run, stop the current queue invocation instead of looping repeatedly on the same stale state.
-5. If it exists and `stage: done`, ignore it and continue to ticket selection.
-6. If it does not exist, continue to ticket selection.
+## Stage model
 
-## Ticket Selection
+- `waiting-worker` — ticket selected; implementation artifact expected next
+- `waiting-validation` — implementation exists; validation in progress or next
+- `waiting-review` — validation is green; review artifact expected next
+- `done` — invocation complete / tombstone state
 
-When there is no unfinished orchestrator state:
+## Selection model
 
-1. Run `tk ready`
-2. If empty, stop
-3. Build the eligible candidate list in this order:
-   - prefer listed tickets already marked `[in_progress]`
-   - then consider other ready tickets
-4. For each candidate, inspect `tk show <ticket-id>` and skip it if any of the following are true:
-   - the Notes section already contains `Gate: ESCALATE`
-   - the ticket is `type: epic`
-   - the Children section contains any child marked `[open]` or `[in_progress]`
-5. Pick the **first eligible leaf** candidate
-6. If no eligible candidate remains, stop and report that all ready tickets are escalated or ineligible
-7. If the chosen ticket is not already `in_progress`, run:
-   - `tk start <ticket-id>`
-8. Write `ticket-flow/current.md` with `stage: waiting-worker`
-9. Overwrite `ticket-flow/invocation.md` with `status: armed`, the selected `ticket`, and the matching `run_token`
-10. Continue through the linear chain; every downstream step must require the armed invocation guard before doing work
+Automatic selection should:
+- start from `tk ready`
+- prefer tickets already marked `in_progress`
+- skip:
+  - escalated tickets
+  - epics
+  - parents with open / in-progress children
+  - tickets with unmet dependencies
+- pick the first eligible leaf ticket
 
-## Worker Spawn
+## Validation model
 
-Spawn a fresh subagent using the base `worker` agent with the `ticket-implement` workflow contract.
+Validation should:
+- run in the current checkout
+- prefer targeted commands first
+- broaden only when repo norms or ticket risk justify it
+- fix ticket-caused failures when appropriate
+- write a truthful blocked artifact for unrelated red repo state, missing implementation state, or genuine blockers
+- never perform destructive git/worktree operations to classify failures
 
-Requirements for the worker task:
-- read `.tickets/<ticket-id>.md`
-- read and write all `ticket-flow/*` workflow artifacts via `read_artifact` / `write_artifact`, never via repo-root files
-- inspect the ticket notes with `tk show <ticket-id>` and read the Notes section
-- if `tk show <ticket-id>` indicates `type: epic` or any child ticket still marked `[open]` or `[in_progress]`, stop and report that selection picked a non-leaf ticket; do **not** implement a child ticket instead
-- gather all relevant code context before editing
-- implement only this ticket
-- do not run the repo validation loop in this step
-- write the exact `implementation_artifact` path from `ticket-flow/current.md` with `status: ready-for-validation` or `blocked`
-- do not close the ticket
-- do not add ticket notes
-- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
+## Finalization model
 
-The orchestrator must set `fork: false` when spawning the worker.
+Finalization handles four outcomes:
+- PASS
+- REVISE
+- ESCALATE
+- BLOCKED
 
-## Validation Spawn
+Behavior:
+- implementation blocked -> escalate immediately
+- validation blocked -> escalate immediately
+- review PASS -> add PASS note and close ticket
+- review REVISE attempt 1 or 2 -> add REVISE note and leave in progress
+- review REVISE attempt 3 -> escalate
+- always finish by setting `current.json` to `done` and blocking `invocation.json`
 
-When the implementation artifact exists:
+## Queue notes
 
-1. If it is `ready-for-validation`, update `ticket-flow/current.md` to `stage: waiting-validation`, then continue to the validation worker.
-2. If it is `blocked`, leave `ticket-flow/current.md` unchanged and let finalization handle escalation directly from the implementation artifact.
+Keep:
+- `ticket-flow/progress.md`
+- `ticket-flow/lessons-learned.md`
 
-Requirements for the validation task:
-- read `.tickets/<ticket-id>.md`
-- read and write all `ticket-flow/*` workflow artifacts via `read_artifact` / `write_artifact`, never via repo-root files
-- read the exact `implementation_artifact` path from `ticket-flow/current.md`
-- run the repo's relevant validation commands
-- prefer documented test, typecheck, lint, and build commands from files like `package.json`, `Makefile`, `justfile`, CI config, or `README.md`
-- include commands such as `ty check`, `mypy src/`, and `pytest tests/ -x -v` when the repo clearly uses them
-- fix issues until all pass or are genuinely blocked
-- write the exact `validation_artifact` path from `ticket-flow/current.md` with `status: ready-for-review` or `blocked`
-- do not close the ticket
-- do not add ticket notes
-- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
+Queue progress is useful operational telemetry, but it is **not** the source of truth for stage transitions. JSON state files are.
 
-The orchestrator must set `fork: false` when spawning the validation worker.
-
-## Review Spawn
-
-When the validation artifact exists and is `ready-for-review`:
-
-1. Update `ticket-flow/current.md` to `stage: waiting-review`
-2. Spawn a fresh subagent using the base `reviewer` agent with the `ticket-review` workflow contract
-3. Stop
-
-Requirements for the reviewer task:
-- read `.tickets/<ticket-id>.md`
-- read and write all `ticket-flow/*` workflow artifacts via `read_artifact` / `write_artifact`, never via repo-root files
-- read the exact `implementation_artifact` path from `ticket-flow/current.md`
-- read the exact `validation_artifact` path from `ticket-flow/current.md`
-- inspect the current diff
-- critically audit correctness, acceptance criteria, quality, and edge cases
-- write the exact `review_artifact` path from `ticket-flow/current.md`
-- do not edit code
-- do not close the ticket
-- do not add ticket notes
-- if the ticket contains an ExecPlan Reference section, read the referenced plan file and follow the milestone-specific guidance
-
-The orchestrator must set `fork: false` when spawning the reviewer.
-
-## Finalization
-
-Finalization must handle three distinct outcomes:
-
-1. implementation blocked before validation,
-2. validation blocked before review, or
-3. review completed with `gate: PASS` or `gate: REVISE`
-
-Procedure:
-
-1. Read the implementation artifact for implementation details
-2. If the implementation artifact says `status: blocked`, add an escalation note that includes the exact line `Gate: ESCALATE`, update `ticket-flow/current.md` to `stage: done`, disarm `ticket-flow/invocation.md`, and stop finalization without requiring a validation or review artifact
-3. Otherwise read the validation artifact for validation details
-4. If the validation artifact says `status: blocked`, add an escalation note that includes the exact line `Gate: ESCALATE`, update `ticket-flow/current.md` to `stage: done`, disarm `ticket-flow/invocation.md`, and stop finalization without requiring a review artifact
-5. Otherwise read the exact `review_artifact` path from `ticket-flow/current.md`
-6. Parse `gate: PASS` or `gate: REVISE`
-7. Inspect existing ticket notes and count failed review cycles by counting prior notes containing `Gate: REVISE`
-   - use `tk show <ticket-id>` and inspect the Notes section
-8. Add a ticket note with `tk add-note <ticket-id> ...`
-9. If PASS, also run `tk close <ticket-id>`
-10. If REVISE and this would be failed review **1 or 2**, add a revise note and leave the ticket `in_progress`
-11. If REVISE and this would be failed review **3**, add an escalation note with `Gate: ESCALATE` and leave the ticket `in_progress`
-12. Update `ticket-flow/current.md` to `stage: done`
-13. Disarm `ticket-flow/invocation.md`
-14. Stop
-
-### PASS note format
-
-Use a compact structured note like:
-
-```text
-Implementation complete.
-Gate: PASS
-
-Summary:
-- <implementation summary>
-
-Validation:
-- <command you ran>: PASS
-- <repeat one bullet per validation command>
-
-Review:
-- acceptance criteria satisfied
-```
-
-### REVISE note format
-
-Use a compact structured note like:
-
-```text
-Review complete.
-Gate: REVISE
-Review Attempt: <N>/3
-
-Findings:
-- [SEVERITY] Title — file:line — remediation
-- ...
-
-Status:
-- ticket remains in_progress
-```
-
-### ESCALATE note format
-
-Use a compact structured note like:
-
-```text
-Automatic escalation.
-Gate: ESCALATE
-Reason: maximum automatic review retries reached (3/3) OR implementation blocked before validation OR validation blocked before review
-
-Findings:
-- [SEVERITY] Title — file:line — remediation
-- ...
-
-Status:
-- requires human intervention
-- automatic ticket-flow processing should skip this ticket
-```
-
-## Reset behavior
-
-A separate `/ticket-reset` prompt may overwrite `ticket-flow/current.md` with a tombstone `stage: done` record and also block `ticket-flow/invocation.md`.
-That reset must never close or reopen tickets automatically; it only clears stale orchestrator state.
-
-## Important Behavior
-
-- `ticket-pick` must block stale invocations by default and arm only a freshly selected ticket.
-- Downstream steps must refuse to proceed unless `ticket-flow/invocation.md` says `status: armed` for the same ticket-flow attempt.
-- Finalization and reset should disarm the invocation guard when that ticket-flow attempt is over.
-- If an awaited artifact is missing, **stop immediately** and do not duplicate work.
-- Do not use prompt loops or convergence as the ticket queue manager.
-- The real stop condition is ticket/artifact state, not whether the main session made edits.
-
-
-## Ralph-style Queue Notes
-
-When running a multi-ticket queue, follow these principles:
-
-- one ticket per loop iteration
-- keep queue progress externalized in `ticket-flow/progress.md`
-- capture only durable, reusable learnings in `ticket-flow/lessons-learned.md`
-- stop the queue when there are no eligible tickets left instead of relying on generic convergence
-- prefer fresh loop iterations so each ticket starts from clean context with artifacts as the source of truth
+Suggested progress fields:
+- `current_ticket`
+- `current_run_token`
+- counts for PASS / REVISE / ESCALATE / BLOCKED
+- history bullets with concise outcome summaries
