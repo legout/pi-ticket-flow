@@ -74,8 +74,32 @@ function taskPreview(task: string | undefined, maxLen = 48): string | undefined 
 	return firstLine.length > maxLen ? `${firstLine.slice(0, maxLen - 1)}…` : firstLine;
 }
 
+function inferTaskLabel(agent: string, task: string | undefined): string | undefined {
+	if (!task) return undefined;
+	const normalized = task.toLowerCase();
+	if (normalized.includes("implement the currently selected ticket") || normalized.includes("implement exactly this ticket")) {
+		return "Implementation";
+	}
+	if (normalized.includes("validate and fix the currently selected ticket") || normalized.includes("validation is green")) {
+		return "Validation";
+	}
+	if (normalized.includes("acceptance criteria satisfaction") || normalized.includes("lens: correctness")) {
+		return "Correctness Review";
+	}
+	if (normalized.includes("regression risk") || normalized.includes("lens: regression")) {
+		return "Regression Review";
+	}
+	if (normalized.includes("validation-and-maintainability") || normalized.includes("adequacy of validation and test coverage")) {
+		return "Test Review";
+	}
+	if (normalized.includes("critically review the currently selected ticket") || normalized.includes("perform a deep candidate review")) {
+		return agent === "reviewer" ? "Review" : undefined;
+	}
+	return undefined;
+}
+
 function formatTaskLabel(name: string | undefined, agent: string, task: string | undefined): string {
-	const label = name?.trim() || taskPreview(task) || displayName(agent);
+	const label = name?.trim() || inferTaskLabel(agent, task) || taskPreview(task) || displayName(agent);
 	return `${label} (${agent})`;
 }
 

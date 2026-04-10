@@ -121,6 +121,30 @@ function extractTaskPreview(task: string | undefined, maxLen = 120): string | un
 	return firstLine.length > maxLen ? `${firstLine.slice(0, maxLen - 3)}...` : firstLine;
 }
 
+function inferTaskLabel(agent: string | undefined, task: string | undefined): string | undefined {
+	if (!task) return undefined;
+	const normalized = task.toLowerCase();
+	if (normalized.includes("implement the currently selected ticket") || normalized.includes("implement exactly this ticket")) {
+		return "Implementation";
+	}
+	if (normalized.includes("validate and fix the currently selected ticket") || normalized.includes("validation is green")) {
+		return "Validation";
+	}
+	if (normalized.includes("acceptance criteria satisfaction") || normalized.includes("lens: correctness")) {
+		return "Correctness Review";
+	}
+	if (normalized.includes("regression risk") || normalized.includes("lens: regression")) {
+		return "Regression Review";
+	}
+	if (normalized.includes("validation-and-maintainability") || normalized.includes("adequacy of validation and test coverage")) {
+		return "Test Review";
+	}
+	if (normalized.includes("critically review the currently selected ticket") || normalized.includes("perform a deep candidate review")) {
+		return agent === "reviewer" ? "Review" : undefined;
+	}
+	return undefined;
+}
+
 export function renderDelegatedSubagentResult(
 	message: { content?: unknown; details?: DelegatedDetails },
 	options: MessageRenderOptions,
@@ -129,7 +153,9 @@ export function renderDelegatedSubagentResult(
 	const details = message.details;
 	const parallelResults = details?.parallelResults ?? [];
 	const hasParallelResults = parallelResults.length > 0;
-	const label = hasParallelResults ? (details?.name ?? "Parallel") : (details?.name ?? details?.agent ?? DEFAULT_AGENT);
+	const label = hasParallelResults
+		? (details?.name ?? "Parallel")
+		: (details?.name ?? inferTaskLabel(details?.agent, details?.task) ?? details?.agent ?? DEFAULT_AGENT);
 	const agentTag = !hasParallelResults && details?.agent ? ` (${details.agent})` : "";
 	const context = details?.context === "fork" ? theme.fg("warning", " [fork]") : "";
 	const messages = hasParallelResults
@@ -164,7 +190,7 @@ export function renderDelegatedSubagentResult(
 	if (hasParallelResults) {
 		for (let index = 0; index < parallelResults.length; index++) {
 			const result = parallelResults[index]!;
-			const taskLabel = result.name ?? result.agent ?? `task-${index + 1}`;
+			const taskLabel = result.name ?? inferTaskLabel(result.agent, undefined) ?? result.agent ?? `task-${index + 1}`;
 			const taskAgentTag = result.agent ? ` (${result.agent})` : "";
 			box.addChild(new Text(theme.fg("toolTitle", `=== Task ${index + 1}: ${taskLabel}${taskAgentTag} ===`), 0, 0));
 			const taskMessages = (result.messages ?? []) as SessionMessage[];

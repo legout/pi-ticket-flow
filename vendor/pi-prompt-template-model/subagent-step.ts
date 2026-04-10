@@ -170,19 +170,48 @@ function extractTicketId(taskText: string): string | undefined {
 
 function deriveDelegatedTaskName(promptName: string, agent: string, taskText: string): string {
 	const normalized = promptName.trim().toLowerCase();
+	const taskNormalized = taskText.trim().toLowerCase();
 	const ticketId = extractTicketId(taskText);
 	const withTicket = (label: string) => ticketId ? `${label} ${ticketId}` : label;
 
-	if (normalized.includes("implement")) return withTicket("Implementation");
-	if (normalized.includes("test-fix") || normalized.includes("validate") || normalized.includes("validation")) {
+	if (
+		normalized.includes("implement") ||
+		taskNormalized.includes("implement the currently selected ticket") ||
+		taskNormalized.includes("implement exactly this ticket")
+	) return withTicket("Implementation");
+	if (
+		normalized.includes("test-fix") ||
+		normalized.includes("validate") ||
+		normalized.includes("validation") ||
+		taskNormalized.includes("validate and fix the currently selected ticket") ||
+		taskNormalized.includes("validation is green")
+	) {
 		return withTicket("Validation");
 	}
-	if (normalized.includes("correctness")) return withTicket("Correctness Review");
-	if (normalized.includes("regression")) return withTicket("Regression Review");
-	if (normalized.includes("deep-tests") || normalized.endsWith("-tests") || normalized.includes(" tests")) {
+	if (
+		normalized.includes("correctness") ||
+		taskNormalized.includes("lens: correctness") ||
+		taskNormalized.includes("acceptance criteria satisfaction")
+	) return withTicket("Correctness Review");
+	if (
+		normalized.includes("regression") ||
+		taskNormalized.includes("lens: regression") ||
+		taskNormalized.includes("regression risk")
+	) return withTicket("Regression Review");
+	if (
+		normalized.includes("deep-tests") ||
+		normalized.endsWith("-tests") ||
+		normalized.includes(" tests") ||
+		taskNormalized.includes("validation-and-maintainability") ||
+		taskNormalized.includes("adequacy of validation and test coverage")
+	) {
 		return withTicket("Test Review");
 	}
-	if (normalized.includes("review")) return withTicket("Review");
+	if (
+		normalized.includes("review") ||
+		taskNormalized.includes("critically review the currently selected ticket") ||
+		taskNormalized.includes("perform a deep candidate review")
+	) return withTicket("Review");
 
 	const stripped = normalized
 		.replace(/^ticket-/, "")
