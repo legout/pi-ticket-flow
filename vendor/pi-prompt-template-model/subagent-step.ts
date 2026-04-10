@@ -687,8 +687,11 @@ export async function executeSubagentPromptStep(options: DelegatedPromptOptions)
 		? (options.parallel ?? [])
 		: [{ prompt: options.prompt, args: options.args }];
 	if (tasks.length === 0) return undefined;
+	// For delegated subagents (separate processes), do not prioritize the
+	// orchestrator's current model via the "already active" shortcut.
+	// The subagent should follow the prompt's preferred model ordering instead.
 	const retryModelCandidates = !isParallelRequest && options.prompt.models.length > 0
-		? await listModelCandidates(options.prompt.models, currentModel, ctx.modelRegistry as RegistryLike)
+		? await listModelCandidates(options.prompt.models, undefined, ctx.modelRegistry as RegistryLike)
 		: [];
 	const maxRetries = isParallelRequest ? 0 : getDelegatedRetryCount();
 
