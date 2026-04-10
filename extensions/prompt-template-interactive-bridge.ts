@@ -24,6 +24,11 @@ import {
   type RoleMessage,
   type SessionEntryLike,
 } from "./delegated-subagent-outcome.ts";
+import {
+  deriveDelegatedExecutionPolicy,
+  detectDelegatedPolicyViolation,
+  type DelegatedExecutionPolicy,
+} from "./delegated-execution-policy.ts";
 import { buildTaskMessage, ensureAssistantSummary, formatLoadedSkillBlock } from "./bridge-message-utils.ts";
 import { readSkillContent, resolveSkillPath } from "../vendor/pi-prompt-template-model/prompt-loader.ts";
 
@@ -118,6 +123,7 @@ interface RunningTask {
   name?: string;
   agent: string;
   model: string;
+  policy?: DelegatedExecutionPolicy;
   surface: string;
   sessionFile: string;
   baselineEntryCount: number;
@@ -442,6 +448,7 @@ async function launchTask(
   }
 
   const effectiveSkills = mergeSkillLists(agentDefs.skills, taskReq.skill ?? request.skill);
+  const effectivePromptSkill = taskReq.skill ?? request.skill;
   const effectiveModel = taskReq.model ?? request.model ?? agentDefs.model;
   const effectiveTools = agentDefs.tools;
   const effectiveThinking = taskReq.thinking ?? request.thinking ?? agentDefs.thinking;
@@ -558,6 +565,7 @@ async function launchTask(
       name: taskReq.name,
       agent: taskReq.agent,
       model: effectiveModel,
+      policy: deriveDelegatedExecutionPolicy(effectivePromptSkill, taskReq.task),
       surface,
       sessionFile: subagentSessionFile,
       baselineEntryCount,
@@ -626,13 +634,28 @@ function cleanupTask(task: RunningTask) {
 }
 
 async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgressSnapshot) => void): Promise<TaskResult> {
+  let policyViolationMessage: string | undefined;
+
+  const abortOnPolicyViolation = () => {
+    if (policyViolationMessage || !task.policy || !existsSync(task.sessionFile)) return;
+    const entries = getNewEntries(task.sessionFile, task.baselineEntryCount);
+    const messages = extractRoleMessages(entries as SessionEntryLike[]);
+    const violation = detectDelegatedPolicyViolation(messages, task.policy);
+    if (!violation) return;
+    policyViolationMessage = violation;
+    task.abortController.abort();
+  };
+
   try {
     const exitCode = await pollForExit(task.surface, task.abortController.signal, {
       interval: 1000,
       onTick() {
         onProgress?.(snapshotTask(task));
+        abortOnPolicyViolation();
       },
     });
+
+    abortOnPolicyViolation();
 
     const entries = existsSync(task.sessionFile) ? getNewEntries(task.sessionFile, task.baselineEntryCount) : [];
     const rawRoleMessages = extractRoleMessages(entries as SessionEntryLike[]);
@@ -651,11 +674,11 @@ async function watchTask(task: RunningTask, onProgress?: (snapshot: TaskProgress
     };
   } catch (error) {
     cleanupTask(task);
-    const message = task.abortController.signal.aborted
+    const message = policyViolationMessage ?? (task.abortController.signal.aborted
       ? "Delegated subagent cancelled."
       : error instanceof Error
         ? error.message
-        : String(error);
+        : String(error));
     return {
       name: task.name,
       agent: task.agent,

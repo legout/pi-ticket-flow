@@ -38,12 +38,18 @@ export function buildTaskMessage(
   delegatedSkill?: string,
   delegatedSkillInstructions?: string,
 ): string {
+  const normalizedSkill = delegatedSkill?.trim().toLowerCase() ?? "";
   const modeHint = agentDefaults?.autoExit
     ? "Complete your task autonomously."
     : "Complete your task. When finished, call the subagent_done tool. The user can interact with you at any time.";
   const summaryInstruction = agentDefaults?.autoExit
     ? "Your FINAL assistant message should summarize what you accomplished."
     : "Your FINAL assistant message (before calling subagent_done or before the user exits) should summarize what you accomplished.";
+  const operationalGuardrails = normalizedSkill.includes("ticket-implement")
+    ? "Operational guardrail: do not run validation commands in this step. Do not call bash with pytest, tox, nox, make test, npm test, cargo test, go test, ruff check, mypy, or similar repo validation commands. Leave validation evidence deferred to `ticket-test-fix`."
+    : normalizedSkill.includes("ticket-test-fix")
+      ? "Operational guardrail: when you run validation commands in this step, every bash test command must include a timeout (either the bash tool `timeout` field or a shell timeout wrapper such as `timeout` / `gtimeout`)."
+      : null;
 
   const hasResolvedSkillInstructions = typeof delegatedSkillInstructions === "string" && delegatedSkillInstructions.trim().length > 0;
 
@@ -53,6 +59,7 @@ export function buildTaskMessage(
     }
     return [
       "Task-specific prompt and skill instructions are the authoritative workflow contract for this run.",
+      operationalGuardrails,
       delegatedSkillInstructions,
       task,
     ].join("\n\n");
@@ -70,6 +77,7 @@ export function buildTaskMessage(
   const parts = hasSpecializedContract
     ? [
         contractPreamble,
+        operationalGuardrails,
         hasResolvedSkillInstructions ? delegatedSkillInstructions : null,
         task,
         modeHint,
