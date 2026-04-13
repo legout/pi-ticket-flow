@@ -16,8 +16,7 @@ Optional behavior:
 - pass `--loop N` to cap how many tickets are processed in this invocation
 
 Queue tracking artifacts:
-- `ticket-flow/invocation.json`
-- `ticket-flow/current.json`
+- `ticket-flow/state.json`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
 

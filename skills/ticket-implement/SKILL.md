@@ -31,7 +31,7 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 
 ## Required procedure
 
-1. Parse the delegated handoff as required by the shared handoff skill.
+1. Read `ticket-flow/handoff.json` via `read_artifact` and extract `ticket`, `ticket_path`, `mode`, and `run_token`.
 2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
 3. Read the selected ticket file from `ticket_path`.
 4. Run `tk show <ticket>` and inspect the ticket metadata / notes.
@@ -48,7 +48,7 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 11. Write exactly one implementation artifact at the derived `implementation` path.
 12. Use `status: ready-for-validation` when the ticket implementation is complete.
 13. Use `status: blocked` only when implementation is genuinely blocked.
-14. Do **not** overwrite `ticket-flow/current.json` or `ticket-flow/invocation.json` in this step.
+14. Do **not** overwrite `ticket-flow/state.json` in this step.
 15. Do not call `tk add-note`.
 16. Do not call `tk close`.
 17. End with a short summary naming the ticket id and implementation artifact path.
@@ -65,7 +65,9 @@ Use this format:
 # Implementation Result
 
 ticket: <ticket-id>
+step: implement
 status: ready-for-validation | blocked
+source_artifact: none
 
 ## Summary
 
@@ -76,16 +78,7 @@ status: ready-for-validation | blocked
 - <path>
 - <path>
 
-## Context Used
-
-- <important file or module>
-- <important file or module>
-
-## Validation
-
-- deferred to `ticket-test-fix`
-
-## Validation Evidence
+## Evidence
 
 ```text
 deferred to `ticket-test-fix`
@@ -105,4 +98,4 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not spawn subagents
 - Keep changes focused on the selected ticket
 - Leave all validation and fix-to-green work to `ticket-test-fix`
-- Do not read shared `ticket-flow/current.json` / `ticket-flow/invocation.json` in this delegated step
+- Do not read shared `ticket-flow/state.json` in this delegated step

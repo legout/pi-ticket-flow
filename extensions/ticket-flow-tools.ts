@@ -61,7 +61,7 @@ function parseReady(text: string) {
   return items;
 }
 
-function artifactPaths(ticket: string, runToken: string) {
+export function artifactPaths(ticket: string, runToken: string) {
   return {
     implementation: `ticket-flow/${ticket}/implementation-${runToken}.md`,
     validation: `ticket-flow/${ticket}/validation-${runToken}.md`,
@@ -98,7 +98,8 @@ function inspectTicket(cwd: string, ticket: string, cache: Map<string, string>) 
   const dependencyStatuses = deps.map((dep) => ({ ticket: dep, status: getTicketStatus(cwd, dep, cache) }));
   const unmetDependencies = dependencyStatuses.filter((dep) => dep.status !== "closed");
   const openishChildren = children.filter((child) => child.status === "open" || child.status === "in_progress");
-  const hasEscalate = /Gate:\s*ESCALATE/.test(text);
+  const gateNotes = [...text.matchAll(/Gate:\s*(ESCALATE|UNESCALATE)/gi)].map((m) => m[1].toUpperCase());
+  const hasEscalate = gateNotes.length > 0 && gateNotes[gateNotes.length - 1] === "ESCALATE";
   const type = header.type ?? "task";
   const reasons: string[] = [];
   if (type === "epic") reasons.push("epic");

@@ -97,7 +97,7 @@ if (!runCase("delegated tasks can inline shared and specialized skills together"
       [
         "# Ticket Flow Delegated Handoff",
         "",
-        "Parse `Selection handoff JSON: {...}` and treat it as authoritative.",
+        "Read `ticket-flow/handoff.json` via `read_artifact` and treat it as authoritative.",
       ].join("\n"),
     ),
     formatLoadedSkillBlock(

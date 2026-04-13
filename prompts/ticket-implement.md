@@ -13,5 +13,5 @@ Implement the currently selected ticket only.
 - Do **not** implement a child ticket or sibling ticket instead of the selected ticket.
 - Do **not** run repo validation commands here; leave the result ready for validation.
 - Write only the implementation artifact for this step; do **not** advance the workflow beyond implementation.
-- The implementation artifact must use the exact lowercase contract keys from the `ticket-implement` skill, especially literal `ticket:` and `status:` lines.
+- The implementation artifact must use the exact lowercase contract keys from the `ticket-implement` skill: `ticket:`, `step:`, `status:`, and `source_artifact:`.
 - If prerequisites fail and implementation cannot proceed, stop cleanly and end with `<!-- CHAIN_STOP -->`.

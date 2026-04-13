@@ -1,82 +1,3 @@
----
-description: Initialize pi-ticket-flow project scaffolding (.ticket-flow/AGENTS.md, .ticket-flow/PLANS.md, and AGENTS.md reference)
-model: kimi-coding/k2p5, anthropic/claude-sonnet-4-20250514
-thinking: high
-restore: true
----
-
-Initialize `pi-ticket-flow` in the current project.
-
-Goals:
-1. Create `.ticket-flow/AGENTS.md` with pi-ticket-flow, tk, and ExecPlan usage instructions.
-2. Create `.ticket-flow/PLANS.md` with the project ExecPlan spec.
-3. Create or update the project-root `AGENTS.md` so it references `.ticket-flow/AGENTS.md`.
-
-Rules:
-- Do not overwrite user-authored files blindly.
-- For the root `AGENTS.md`:
-  - If the file does not exist, create it with the block shown below.
-  - If the file exists but does **not** contain `<!-- ticket-flow -->`, **append** the block shown below at the end of the file.
-  - If the file already contains `<!-- ticket-flow -->`, replace everything between `<!-- ticket-flow -->` and `<!-- /ticket-flow -->` (inclusive) with the updated block.
-  - Do not modify any content outside the `<!-- ticket-flow -->` markers.
-- For `.ticket-flow/AGENTS.md` and `.ticket-flow/PLANS.md`: create them if missing; if they already exist, leave them untouched (the user may have customized them).
-- Write `.ticket-flow/PLANS.md` using the exact spec below, with only the Codex-specific wording generalized to refer to a coding agent.
-
-Write `.ticket-flow/AGENTS.md` with content equivalent to:
-
-```md
-# pi-ticket-flow Workflow
-
-Use this repository's ticket-flow workflow for planning and ticket execution.
-
-## ExecPlans
-
-When writing complex features or significant refactors, use an ExecPlan (as described in `.ticket-flow/PLANS.md`) from design to implementation.
-
-## Planning workflow
-
-- Use `/plan <topic>` to go from brainstorming through ExecPlan creation.
-- Use `/plan-chain <topic>` only when brainstorming is already complete and the remaining planning steps are non-interactive.
-- ExecPlans live at `.ticket-flow/plans/<topic-slug>/execplan.md`.
-- Brainstorms live at `.ticket-flow/plans/<topic-slug>/brainstorm.md`.
-
-## Ticket workflow
-
-- Use `tk` for ticket tracking.
-- Use `/ticketize <topic>` to convert an ExecPlan into tk tickets.
-- Use `/ticket-flow` for one-ticket delegated execution.
-- Use `/ticket-queue` for sequential batch execution.
-- Use `/ticket-reset` to clear stale orchestrator state.
-
-## Artifact locations
-
-- `ticket-flow/state.json`
-- `ticket-flow/<ticket-id>/implementation-<run-token>.md`
-- `ticket-flow/<ticket-id>/validation-<run-token>.md`
-- `ticket-flow/<ticket-id>/review-<run-token>.md`
-- `ticket-flow/progress.md`
-- `ticket-flow/lessons-learned.md`
-
-## Ticket guidance
-
-- If a ticket contains an `ExecPlan Reference` block, read the referenced ExecPlan before implementing or reviewing.
-- Keep ExecPlans and architecture documentation aligned with reality as work progresses.
-```
-
-Insert the following block into the project root `AGENTS.md`:
-
-```md
-<!-- ticket-flow -->
-Planning and ticket-execution instructions live in `.ticket-flow/AGENTS.md`.
-Read that file before using `pi-ticket-flow`, `tk`, or ExecPlans in this repository.
-<!-- /ticket-flow -->
-```
-
-The marker-based block enables safe, idempotent re-runs of `/ticket-flow-init`: only the content between the markers is touched.
-
-Write `.ticket-flow/PLANS.md` with exactly this generalized ExecPlan spec:
-
-```md
 # Execution Plans (ExecPlans):
 
 This document describes the requirements for an execution plan ("ExecPlan"), a design document that a coding agent can follow to deliver a working feature or system change. Treat the reader as a complete beginner to this repository: they have only the current working tree and the single ExecPlan file you provide. There is no memory of prior plans and no external context.
@@ -149,7 +70,7 @@ Prefer milestones that deliver an observable, end-to-end slice of behavior rathe
 
 It is acceptable—and often encouraged—to include explicit prototyping milestones when they de-risk a larger change. Examples: adding a low-level operator to a dependency to validate feasibility, or exploring two composition orders while measuring optimizer effects. Keep prototypes additive and testable. Clearly label the scope as “prototyping”; describe how to run and observe results; and state the criteria for promoting or discarding the prototype.
 
-Prefer additive code changes followed by subtractions that keep tests passing. Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk or enable tests to continue passing during a large migration. Describe how to validate both paths and how to retire one safely with tests. When working with multiple new library or feature areas, consider creating spikes that evaluate the feasibility of these features _independently_ of one another, proving that the external library performs as expected and implements the features we need in isolation.
+Prefer additive code changes followed by subtractions that keep tests passing. Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk or enable tests to continue passing during a large migration. Describe how to validate both paths and how to retire one safely with tests. When working with multiple new libraries or feature areas, consider creating spikes that evaluate the feasibility of these features _independently_ of one another, proving that the external library performs as expected and implements the features we need in isolation.
 
 When a plan will later be broken into tickets, prefer milestones that can become independently reviewable tickets. In practice, this usually means user-visible or contract-visible vertical slices plus a small number of clearly labeled enabler or cleanup milestones. Also make it clear which milestones are merely related, which are true prerequisites, and which should not be implemented concurrently because they collide on shared boundaries. Keep the prose narrative; do not replace milestone explanations with a rigid task schema.
 

@@ -18,8 +18,7 @@ These are workflow handoff files created during execution:
 
 | Path | Purpose |
 | --- | --- |
-| `ticket-flow/invocation.json` | Per-invocation guard for the current chain run |
-| `ticket-flow/current.json` | Current orchestrator state |
+| `ticket-flow/state.json` | Orchestrator state (per-invocation guard + stage) |
 | `ticket-flow/<ticket-id>/implementation-<run-token>.md` | Implementation result |
 | `ticket-flow/<ticket-id>/validation-<run-token>.md` | Validation result |
 | `ticket-flow/<ticket-id>/review-<run-token>.md` | Review result |
@@ -30,50 +29,40 @@ Important: these are **session artifacts**, not normal repository files.
 Use `read_artifact` / `write_artifact` for all `ticket-flow/*` workflow state.
 Do not create or inspect orchestrator state with repo-file tools (`read`, `write`, `edit`, shell redirection) against a checked-in `ticket-flow/` directory; that creates state the orchestrator will not see.
 
-## `ticket-flow/invocation.json`
+## `ticket-flow/state.json`
 
-This is the per-invocation guard. Use this shape:
+This is the orchestrator state. Use this shape:
 
 ```json
 {
-  "version": 2,
-  "status": "armed or blocked",
-  "mode": "single or queue",
+  "version": 3,
   "ticket": "flo-1234 or null",
   "ticket_path": ".tickets/flo-1234.md or null",
   "run_token": "20260410T165200Z or null",
+  "mode": "single or queue",
+  "stage": "selecting | implementing | validating | reviewing | done",
   "reason": "short explanation"
 }
 ```
 
-`ticket-pick` overwrites this at the start of each `/ticket-flow` or `/ticket-queue` invocation.
-Main-session steps should proceed only when it says `status: "armed"` and the guarded `ticket` / `run_token` still match the selected attempt.
-`/ticket-reset` and `ticket-finalize` overwrite it with a blocked sentinel when a run is over.
+`ticket-pick` overwrites this at the start of each `/ticket-flow` or `/ticket-queue` invocation, and again with the armed state after selecting a ticket.
+Main-session steps should proceed only when `stage` is not `done` and the guarded `ticket` / `run_token` still match the selected attempt.
+`/ticket-reset` and `ticket-finalize` overwrite it with a `done` tombstone when a run is over.
 
-## `ticket-flow/current.json`
+## Delegated handoff artifact
 
-This is the current orchestrator state. Use this shape:
+When `ticket-pick` selects a ticket, it writes `ticket-flow/handoff.json`:
 
 ```json
 {
-  "version": 2,
-  "stage": "active | done",
-  "reason": "short explanation"
+  "ticket": "flo-1234",
+  "ticket_path": ".tickets/flo-1234.md",
+  "mode": "single",
+  "run_token": "20260410T165200Z"
 }
 ```
 
-`current.json` is now only a lightweight main-session marker for whether the orchestrator is still active or done.
-Ticket identity and ticket file location live in `invocation.json`, while implementation / validation / review artifact paths are derived deterministically from `ticket` + `run_token`.
-Fresh delegated worker / reviewer steps do not need to read `current.json`; they consume the compact handoff emitted by `ticket-pick`.
-Older sessions may still contain `waiting-worker`, `waiting-validation`, or `waiting-review`; treat those as legacy non-`done` active runs that should be reset or finalized, not as new states to write going forward.
-
-## Delegated handoff summary
-
-When `ticket-pick` selects a ticket, its final assistant message must start with:
-
-`Selection handoff JSON: {"ticket":"flo-1234","ticket_path":".tickets/flo-1234.md","mode":"single","run_token":"20260410T165200Z"}`
-
-Fresh delegated steps (`ticket-implement`, `ticket-test-fix`, `ticket-review`, and the internal `ticket-review-deep-*` passes) parse that summary from chain context, derive deterministic artifact paths from `ticket` + `run_token`, and avoid reading shared `ticket-flow/invocation.json` / `ticket-flow/current.json`.
+Fresh delegated steps (`ticket-implement`, `ticket-test-fix`, `ticket-review`) read this artifact via `read_artifact`, derive deterministic artifact paths from `ticket` + `run_token`, and avoid reading shared `ticket-flow/state.json`.
 
 ## Artifact path derivation
 
@@ -89,36 +78,26 @@ This reduces duplicated machine state and removes a common source of path-mismat
 
 ## Ownership rules
 
-- `ticket-pick` initializes `current.json` with `stage: "active"`, arms `invocation.json`, and emits the delegated handoff summary
+- `ticket-pick` writes `state.json` with `stage: "implementing"` and emits the delegated handoff summary
 - `ticket-implement`, `ticket-test-fix`, and `ticket-review` consume that handoff and write only their own evidence artifacts
-- delegated steps do **not** mutate `ticket-flow/current.json` or `ticket-flow/invocation.json`
-- `ticket-finalize` writes the `done` tombstone and blocks `invocation.json`
+- delegated steps do **not** mutate `ticket-flow/state.json`
+- `ticket-finalize` writes `state.json` with `stage: "done"`
 - `progress.md` and `lessons-learned.md` are useful queue telemetry, but main-session JSON state plus deterministic per-run artifacts are the durable workflow contract
 
 ## Queue completion
 
 When the queue is empty, `ticket-pick` writes:
 
-### `ticket-flow/current.json`
+### `ticket-flow/state.json`
 
 ```json
 {
-  "version": 2,
-  "stage": "done",
-  "reason": "queue complete"
-}
-```
-
-### `ticket-flow/invocation.json`
-
-```json
-{
-  "version": 2,
-  "status": "blocked",
-  "mode": "queue",
+  "version": 3,
   "ticket": null,
   "ticket_path": null,
   "run_token": null,
+  "mode": "queue",
+  "stage": "done",
   "reason": "queue complete"
 }
 ```

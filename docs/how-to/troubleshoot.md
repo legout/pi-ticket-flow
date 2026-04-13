@@ -38,7 +38,7 @@ Also note:
 
 If behavior looks wrong, inspect the active agent file and run `/reload`.
 
-## `ticket-flow/current.json` or `ticket-flow/invocation.json` is stale or malformed
+## `ticket-flow/state.json` is stale or malformed
 
 Run:
 
@@ -46,9 +46,9 @@ Run:
 /ticket-reset
 ```
 
-This writes a safe JSON tombstone to `ticket-flow/current.json` and a blocked sentinel to `ticket-flow/invocation.json` so the next run can start cleanly.
+This writes a safe JSON tombstone to `ticket-flow/state.json` so the next run can start cleanly.
 
-`/ticket-reset` also clears legacy markdown state files (`ticket-flow/current.md` and `ticket-flow/invocation.md`) if they still exist from older workflow versions.
+`/ticket-reset` also clears legacy state artifacts (`ticket-flow/current.json`, `ticket-flow/invocation.json`, `ticket-flow/current.md`, and `ticket-flow/invocation.md`) if they still exist from older workflow versions.
 
 If `/ticket-queue` stops immediately because it found unfinished or malformed orchestrator state, that is intentional — fix the stale state with `/ticket-reset` before retrying the queue.
 
@@ -58,21 +58,19 @@ Transient delegated-provider overloads (`429`, `temporarily overloaded`, rate-li
 
 Inspect:
 
-- `ticket-flow/invocation.json`
-- `ticket-flow/current.json`
+- `ticket-flow/state.json`
 - the referenced implementation, validation, and review artifacts
 
 Remember:
 
-- `invocation.json` carries the active ticket id, ticket path, and run token
-- `current.json` is only an active/done marker
+- `state.json` carries the active ticket id, ticket path, run token, and stage
 
 Common causes:
 
 - implementation artifact is `blocked`
 - validation artifact is missing or not `ready-for-review`
 - delegated selection handoff is missing or malformed in chain context
-- the invocation guard is still `blocked`
+- the orchestrator stage is `done` when it should be `implementing` / `validating` / `reviewing`
 - the implementation artifact no longer matches the actual worktree
 
 ## Queue finishes immediately

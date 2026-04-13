@@ -46,7 +46,7 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 
 ## Required procedure
 
-1. Parse the delegated handoff as required by the shared handoff skill.
+1. Read `ticket-flow/handoff.json` via `read_artifact` and extract `ticket`, `ticket_path`, `mode`, and `run_token`.
 2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
 3. If a validation artifact already exists at the derived validation path and indicates `status: ready-for-review` or `status: blocked`, report that validation is already recorded and stop normally so downstream review/finalization can continue.
 4. Read the implementation artifact at the derived implementation path.
@@ -60,16 +60,16 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 10. Read the ticket file from `ticket_path`.
 11. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while validating/fixing.
 12. Run and fix using the repo's relevant validation commands.
-   - Determine commands from the repo's actual guidance (`README.md`, `pyproject.toml`, `package.json`, `Makefile`, `justfile`, CI config, etc.).
-   - Prefer targeted commands first.
-   - Run broader lint / typecheck / test / build commands only when they are standard for the repo or necessary to establish reviewability.
-   - If broader validation fails on an unrelated issue, do **not** mutate git state to investigate; record the blocker truthfully.
-   - If the worktree no longer contains the implementation described by the implementation artifact, write a blocked validation artifact and stop.
-   - Fix issues until the chosen validation scope is green or you are genuinely blocked.
+    - Determine commands from the repo's actual guidance (`README.md`, `pyproject.toml`, `package.json`, `Makefile`, `justfile`, CI config, etc.).
+    - Prefer targeted commands first.
+    - Run broader lint / typecheck / test / build commands only when they are standard for the repo or necessary to establish reviewability.
+    - If broader validation fails on an unrelated issue, do **not** mutate git state to investigate; record the blocker truthfully.
+    - If the worktree no longer contains the implementation described by the implementation artifact, write a blocked validation artifact and stop.
+    - Fix issues until the chosen validation scope is green or you are genuinely blocked.
 13. Write exactly one validation artifact at the derived validation path.
 14. If validation is green, write `status: ready-for-review`.
 15. If validation is genuinely blocked, write `status: blocked`.
-16. Do **not** overwrite `ticket-flow/current.json` or `ticket-flow/invocation.json` in this step.
+16. Do **not** overwrite `ticket-flow/state.json` in this step.
 17. Do not call `tk add-note`.
 18. Do not call `tk close`.
 19. End with a short summary naming the ticket id, final status, and validation artifact path.
@@ -86,8 +86,9 @@ Use this format:
 # Validation Result
 
 ticket: <ticket-id>
+step: validate
 status: ready-for-review | blocked
-source_implementation_artifact: <implementation_artifact path>
+source_artifact: <implementation_artifact path>
 
 ## Summary
 
@@ -98,17 +99,7 @@ source_implementation_artifact: <implementation_artifact path>
 - <path>
 - <path>
 
-## Context Used
-
-- <important file or module>
-- <important file or module>
-
-## Validation
-
-- <command you ran>: PASS | FAIL
-- <repeat one bullet per validation command>
-
-## Validation Evidence
+## Evidence
 
 ```text
 <paste concise command outputs or the decisive lines>
@@ -130,4 +121,4 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not broaden scope beyond what is needed to validate the selected ticket
 - Validate the current checkout only
 - Do not perform destructive or state-rewriting git operations
-- Do not read or mutate shared `ticket-flow/current.json` / `ticket-flow/invocation.json` in this delegated step
+- Do not read or mutate shared `ticket-flow/state.json` in this delegated step

@@ -1,3 +1,8 @@
+---
+name: pi-ticket-flow
+description: Standalone pi package for tk ticket workflows with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.
+---
+
 # pi-ticket-flow
 
 Standalone pi package for **tk ticket workflows** with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.
@@ -51,7 +56,6 @@ It bundles:
 - `/ticket-flow` — delegated single-ticket workflow (pick → implement → validate/fix → review → finalize)
 - `/ticket-queue` — sequential queue processing until no eligible tickets remain (loops, tracks progress/lessons)
 - `/ticket-test-fix` — validate and fix the currently selected ticket until it is ready for review
-- `/ticket-review-deep` — deep ticket review with parallel review passes and final consolidation
 - `/ticket-reset` — clear stale orchestrator state
 - `/bridge-smoke` — verify delegated prompt execution works
 
@@ -65,7 +69,7 @@ It bundles:
 - `researcher` — focused research agent for docs, APIs, best practices, and technology choices
 - `change-planner` — shared planner for refactor/simplify analysis and todo creation
 
-Ticket implementation, validation/fix-to-green, and review use the base `worker` and `reviewer` agents provided by `pi-interactive-subagents`, specialized through the `ticket-implement`, `ticket-test-fix`, and `ticket-review` skills/prompts.
+Ticket implementation, validation/fix-to-green, and review use the base `worker` and `reviewer` agents provided by `pi-interactive-subagents` via specialized prompts/skills.
 
 Ticket-flow runtime state lives in **session artifacts** (`write_artifact` / `read_artifact`), not in repo-root `ticket-flow/` files. Automatic selection targets **leaf tickets only** and skips epics or parent tickets with open children.
 
@@ -249,15 +253,14 @@ Recommended workflow guidance files:
 ### Session artifacts (ephemeral)
 
 Artifacts used by the workflow:
-- `ticket-flow/invocation.json`
-- `ticket-flow/current.json`
+- `ticket-flow/state.json`
 - `ticket-flow/<ticket-id>/implementation-<run-token>.md`
 - `ticket-flow/<ticket-id>/validation-<run-token>.md`
 - `ticket-flow/<ticket-id>/review-<run-token>.md`
 - `ticket-flow/progress.md`
 - `ticket-flow/lessons-learned.md`
 
-`invocation.json` is the main-session source of truth for the active ticket, ticket path, and run token. `current.json` is now just a lightweight active/done marker. Fresh delegated worker / reviewer steps consume a compact `Selection handoff JSON: ...` summary from `ticket-pick` plus deterministic per-run artifact paths derived from `ticket` + `run_token`, which reduces cross-session fragility.
+`state.json` is the main-session source of truth for the active ticket, ticket path, run token, and stage. Fresh delegated worker / reviewer steps read `ticket-flow/handoff.json` from `ticket-pick` plus deterministic per-run artifact paths derived from `ticket` + `run_token`, which reduces cross-session fragility.
 
 ## Notes
 
@@ -266,6 +269,5 @@ Artifacts used by the workflow:
 - `/ticket-flow` is the preferred single-ticket path.
 - `/ticket-queue` is the preferred multi-ticket loop.
 - `/review-deep` is the higher-confidence path for non-ticket code review when you want multiple independent review lenses plus final consolidation.
-- `/ticket-review-deep` is the optional manual high-confidence ticket review path using parallel review passes plus final consolidation.
 - `/bridge-smoke` is the first thing to run after install.
 - Maintainers can run `npm run smoke:delegated-outcome` to regression-test delegated subagent error detection against captured fixture transcripts.

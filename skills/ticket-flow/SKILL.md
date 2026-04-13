@@ -40,22 +40,21 @@ Current simplified chain:
 2. **No parallel ticket execution.** Do not start a second ticket while one is active.
 3. **Fresh subagents only.** Worker and reviewer must run with fresh context (`fork: false`).
 4. **Use artifacts as the source of truth.** Do not rely on conversational memory alone.
-5. **Use structured machine state.** The main-session operational state files are JSON, not freeform markdown.
+5. **Use structured machine state.** The main-session operational state file is JSON, not freeform markdown.
 6. **Validate the current checkout only.** Do not use git rewinds/stash tricks to classify failures.
 7. **Skip escalated tickets automatically.** Any ticket whose notes contain `Gate: ESCALATE` is not eligible.
 8. **Select leaf tickets only.** Automatic selection must skip epics and parents with open/in-progress children.
 9. **Respect dependencies.** Automatic selection must skip tickets whose listed dependencies are not closed.
 10. **Only close on PASS.** If review is REVISE, leave the ticket `in_progress`.
-11. **Max failed reviews per ticket: 3.** On the 3rd failed review, escalate instead of retrying again.
+11. **Max failed reviews per ticket: 7.** On the 7th failed review, escalate instead of retrying again.
 12. **Blocked implementation or validation escalates immediately in finalization.**
-13. **Only main-session steps own machine state.** Fresh delegated worker/reviewer steps must not read or mutate shared `ticket-flow/current.json` / `ticket-flow/invocation.json`.
+13. **Only main-session steps own machine state.** Fresh delegated worker/reviewer steps must not read or mutate shared `ticket-flow/state.json`.
 
 ## Durable artifact contract
 
 ### Machine state (JSON session artifacts, main-session only)
 
-- `ticket-flow/invocation.json` — per-invocation guard
-- `ticket-flow/current.json` — current orchestrator state
+- `ticket-flow/state.json` — orchestrator state (per-invocation guard + stage)
 
 ### Evidence artifacts (markdown session artifacts)
 
@@ -73,56 +72,41 @@ These are **session artifact names**, not repository-relative files.
 
 ## Delegated handoff contract
 
-`ticket-pick` must emit a compact handoff in its final assistant message so fresh delegated steps can work without reading shared machine-state artifacts.
+`ticket-pick` writes a compact handoff to the session artifact `ticket-flow/handoff.json` so fresh delegated steps can work without reading shared machine-state artifacts.
 
-Use this exact marker:
+Shape:
 
-`Selection handoff JSON: {"ticket":"flo-1234","ticket_path":".tickets/flo-1234.md","mode":"single","run_token":"20260410T165200Z"}`
-
-Rules:
-- compact JSON
-- one line
-- no code fences
-- no extra keys
-- put it at the start of the final assistant message from `ticket-pick`
+```json
+{
+  "ticket": "flo-1234",
+  "ticket_path": ".tickets/flo-1234.md",
+  "mode": "single",
+  "run_token": "20260410T165200Z"
+}
+```
 
 Delegated steps (`ticket-implement`, `ticket-test-fix`, `ticket-review`) must:
-- parse the most recent `Selection handoff JSON: {...}` marker from chain context
+- read `ticket-flow/handoff.json` via `read_artifact`
 - treat it as authoritative for `ticket`, `ticket_path`, `mode`, and `run_token`
 - trust that handoff even if shared state artifacts disagree
 - derive per-run artifact paths from `ticket` + `run_token`
-- avoid reading shared `ticket-flow/current.json` / `ticket-flow/invocation.json`
+- avoid reading shared `ticket-flow/state.json`
 
-## `ticket-flow/invocation.json`
+## `ticket-flow/state.json`
 
 Use this shape:
 
 ```json
 {
-  "version": 2,
-  "status": "armed or blocked",
-  "mode": "single or queue",
+  "version": 3,
   "ticket": "flo-1234 or null",
   "ticket_path": ".tickets/flo-1234.md or null",
   "run_token": "20260410T165200Z or null",
+  "mode": "single or queue",
+  "stage": "selecting | implementing | validating | reviewing | done",
   "reason": "short explanation"
 }
 ```
-
-## `ticket-flow/current.json`
-
-Use this shape:
-
-```json
-{
-  "version": 2,
-  "stage": "active | done",
-  "reason": "short explanation"
-}
-```
-
-`current.json` is now only a lightweight main-session marker for whether the orchestrator is active or done. Ticket identity and ticket file location live in `invocation.json`.
-Older sessions may still contain `waiting-worker`, `waiting-validation`, or `waiting-review`; treat those as legacy non-`done` unfinished runs rather than stages to keep writing.
 
 ## Deterministic helper
 
@@ -141,14 +125,11 @@ Use them for:
 
 ## Stage model
 
-- `active` — ticket selected; delegated implementation / validation / review still belong to this active run
+- `selecting` — ticket selection in progress
+- `implementing` — ticket selected; implementation step is running or about to run
+- `validating` — validation step is running or about to run
+- `reviewing` — review step is running or about to run
 - `done` — invocation complete / tombstone state
-
-Legacy compatibility:
-
-- `waiting-worker` / `waiting-validation` / `waiting-review` may still appear in old sessions
-- treat any non-`done` legacy stage as an active unfinished run
-- do not write those legacy stages in new runs
 
 ## Selection model
 
@@ -183,10 +164,10 @@ Finalization handles four outcomes:
 Behavior:
 - implementation blocked -> escalate immediately
 - validation blocked -> escalate immediately
-- review PASS -> add PASS note and close ticket
-- review REVISE attempt 1 or 2 -> add REVISE note and leave in progress
-- review REVISE attempt 3 -> escalate
-- always finish by setting `current.json` to `done` and blocking `invocation.json`
+- review `status: pass` -> add PASS note and close ticket
+- review `status: revise` attempt 1-6 -> add REVISE note and leave in progress
+- review `status: revise` attempt 7 -> escalate
+- always finish by writing `state.json` with `stage: "done"`
 
 ## Queue notes
 

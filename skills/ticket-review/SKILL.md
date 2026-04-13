@@ -34,7 +34,7 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 
 ## Required procedure
 
-1. Parse the delegated handoff as required by the shared handoff skill.
+1. Read `ticket-flow/handoff.json` via `read_artifact` and extract `ticket`, `ticket_path`, `mode`, and `run_token`.
 2. Derive artifact paths from `ticket` + `run_token` using `ticket_flow_artifact_paths`.
 3. Read the selected ticket file from `ticket_path`.
 4. If the ticket contains an **ExecPlan Reference** section, read the referenced ExecPlan file and use the milestone-specific guidance while reviewing.
@@ -46,9 +46,9 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 8. If the implementation artifact says `status: blocked`, report that review is skipped because implementation is blocked, and stop normally so finalization can escalate.
 9. Read the validation artifact.
 10. Parse and verify:
-   - `ticket:` exactly matches the selected ticket
-   - `status:` is present
-   - `source_implementation_artifact:` exactly matches the derived implementation artifact path
+    - `ticket:` exactly matches the selected ticket
+    - `status:` is present
+    - `source_artifact:` exactly matches the derived implementation artifact path
 11. If parsing fails, stop and report that the validation artifact is malformed, then end with `<!-- CHAIN_STOP -->`.
 12. If the validation artifact says `status: blocked`, report that review is skipped because validation is blocked, and stop normally so finalization can escalate.
 13. If the validation artifact does not say `status: ready-for-review`, stop and report that validation is not complete yet, then end with `<!-- CHAIN_STOP -->`.
@@ -58,8 +58,8 @@ Per-run artifact paths are derived deterministically from `ticket` + `run_token`
 17. Do not edit code.
 18. Do not call `tk add-note`.
 19. Do not call `tk close`.
-20. Do **not** overwrite `ticket-flow/current.json` or `ticket-flow/invocation.json` in this step.
-21. End with a short summary naming the ticket id, gate, and review artifact path.
+20. Do **not** overwrite `ticket-flow/state.json` in this step.
+21. End with a short summary naming the ticket id, status, and review artifact path.
 
 ## Artifact contract
 
@@ -73,40 +73,46 @@ Use this format:
 # Review Result
 
 ticket: <ticket-id>
-gate: PASS | REVISE
+step: review
+status: pass | revise
+source_artifact: <validation_artifact path>
 
 ## Summary
 
 - <1-2 sentence verdict>
 
-## Acceptance Criteria Check
+## Files Changed
+
+- <files reviewed>
+
+## Evidence
+
+### Acceptance Criteria Check
 
 - [x] <criterion met>
 - [ ] <criterion not met>
 
-## Findings
+### Findings
 
 - none
 ```
 
-If there are findings, replace the Findings section with entries in this exact format:
+If there are findings, replace the Findings subsection with entries in this exact format:
 
 ```md
-## Findings
-
 ### [HIGH] Short title
 
 - File: `path/to/file.py:123`
-- Evidence: <concrete observation>
+- Observation: <concrete observation>
 - Remediation: <specific fix>
 ```
 
 Only include real, actionable findings.
 
-## Gate policy
+## Status policy
 
-- `PASS` if acceptance criteria are met and there are no material issues
-- `REVISE` if there are real issues that should block closure
+- `pass` if acceptance criteria are met and there are no material issues
+- `revise` if there are real issues that should block closure
 
 ## Rules
 
@@ -114,5 +120,5 @@ Only include real, actionable findings.
 - Do not edit code
 - Do not spawn subagents
 - Be critical but evidence-based
-- If there are no real issues, return `gate: PASS`
-- Do not read or mutate shared `ticket-flow/current.json` / `ticket-flow/invocation.json` in this delegated step
+- If there are no real issues, return `status: pass`
+- Do not read or mutate shared `ticket-flow/state.json` in this delegated step

@@ -35,7 +35,6 @@ This file lists the main user-facing commands. Many additional prompts in `promp
 | --- | --- |
 | `/ticket-flow` | Process exactly one ticket end to end |
 | `/ticket-queue` | Process tickets sequentially |
-| `/ticket-review-deep` | High-confidence deep review for the selected ticket |
 | `/ticket-reset` | Reset stale orchestrator state |
 | `/bridge-smoke` | Verify delegated prompt execution |
 
@@ -54,7 +53,7 @@ These exist in `prompts/` and are usually called by chain workflows rather than 
 - `ticket-test-fix`
 - `ticket-review`
 - `ticket-finalize`
-- the internal `review-deep-*` and `ticket-review-deep-*` passes
+- the internal `review-deep-*` passes
 
 Deprecated compatibility shims:
 - `ticket-mark-validation`

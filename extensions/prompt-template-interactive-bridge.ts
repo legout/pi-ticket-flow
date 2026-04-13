@@ -30,6 +30,7 @@ import {
   type DelegatedExecutionPolicy,
 } from "./delegated-execution-policy.ts";
 import { buildTaskMessage, ensureAssistantSummary, formatLoadedSkillBlock } from "./bridge-message-utils.ts";
+import { recoverDelegatedTicketFlowFailure } from "./ticket-flow-delegated-recovery.ts";
 import { readSkillContent, resolveSkillPath } from "../vendor/pi-prompt-template-model/prompt-loader.ts";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
@@ -724,14 +725,31 @@ async function processSingleRequest(pi: ExtensionAPI, request: DelegatedSubagent
       });
     });
 
+    let messages = result.messages;
+    let isError = result.isError;
+    let errorText = result.errorText;
+
+    if (isError) {
+      const recovered = recoverDelegatedTicketFlowFailure({
+        artifactDir: getArtifactDir(ctx),
+        skill: request.skill,
+        errorText: result.errorText,
+      });
+      if (recovered) {
+        messages = ensureAssistantSummary([], recovered.summary);
+        isError = false;
+        errorText = undefined;
+      }
+    }
+
     const response: DelegatedSubagentResponse = {
       requestId: request.requestId,
       name: result.name,
       context: request.context,
       model: request.model,
-      messages: result.messages,
-      isError: result.isError,
-      errorText: result.errorText,
+      messages,
+      isError,
+      errorText,
     };
     pi.events.emit(RESPONSE_EVENT, response);
   } finally {
