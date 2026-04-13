@@ -25,28 +25,36 @@ function determineStep(skills: string[]): "implement" | "validate" | "review" | 
   return undefined;
 }
 
+const VALID_STATUSES: Record<string, string[]> = {
+  implement: ["ready-for-validation", "blocked"],
+  validate: ["ready-for-review", "blocked"],
+  review: ["pass", "revise"],
+};
+
 function isArtifactValid(
   content: string,
   ticket: string,
   step: string,
-  expectedStatus: string,
-  sourceArtifact: string,
 ): boolean {
-  const lines = content.split("\n");
+  const match = content.match(/^#[^\n]*\n\n([\s\S]*?)(?=\n## )/);
+  if (!match) return false;
+  const contractBlock = match[1];
+  const lines = contractBlock.split("\n");
   let foundTicket = false;
   let foundStep = false;
   let foundStatus = false;
-  let foundSource = false;
+  const validStatuses = VALID_STATUSES[step] ?? [];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === `ticket: ${ticket}`) foundTicket = true;
     if (trimmed === `step: ${step}`) foundStep = true;
-    if (trimmed === `status: ${expectedStatus}`) foundStatus = true;
-    if (trimmed === `source_artifact: ${sourceArtifact}`) foundSource = true;
+    for (const s of validStatuses) {
+      if (trimmed === `status: ${s}`) foundStatus = true;
+    }
   }
 
-  return foundTicket && foundStep && foundStatus && foundSource;
+  return foundTicket && foundStep && foundStatus;
 }
 
 function synthesizeArtifact(
@@ -122,8 +130,7 @@ export function recoverDelegatedTicketFlowFailure(
   if (existsSync(absolutePath)) {
     try {
       const content = readFileSync(absolutePath, "utf8");
-      const expectedStatus = step === "review" ? "revise" : "blocked";
-      if (isArtifactValid(content, ticket, step, expectedStatus, sourceArtifact)) {
+      if (isArtifactValid(content, ticket, step)) {
         return {
           summary: `Recovered delegated ${step} step. Existing valid artifact preserved: ${expectedPath}`,
           artifactPath: expectedPath,

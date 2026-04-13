@@ -101,3 +101,11 @@ Gate: REVISE — Recovery artifact preservation is too permissive: isArtifactVal
 **2026-04-13T20:43:59Z**
 
 Gate: REVISE — isArtifactValid() still too permissive: scans every line so contract fields appearing in summary/evidence body cause false-positive preservation. Must parse only the header/contract block. Review Attempt: 2/3.
+
+**2026-04-13T21:24:59Z**
+
+Gate: ESCALATE — Implementation blocked before validation could run. The delegated implement step wrote a blocked artifact (status: blocked), which cascaded to a blocked validation and skipped review. Ticket needs investigation: the implement step reported success (status: ready-for-validation) but the artifact was actually blocked, suggesting a mismatch between the implement subagent's report and the artifact it wrote. Review attempt 3/7.
+
+**2026-04-13T21:41:17Z**
+
+Gate: UNESCALATE — Bug identified and fixed: isArtifactValid() was comparing against recovery-specific statuses (blocked/revise) instead of accepting all valid statuses (ready-for-validation, ready-for-review, pass, blocked, revise). This caused the recovery code to overwrite good subagent artifacts with blocked ones.
