@@ -6,7 +6,7 @@ Un-escalate a ticket that was previously escalated by the ticket-flow review lim
 
 ## Procedure
 
-1. The user provides a ticket id as the first argument (e.g., `/ticket-unescalate ptf-1234`). If no argument is given, ask the user which ticket to un-escalate.
+1. The user provides a ticket id as the first argument (e.g., `/ticket-unescalate ptf-1234`). Interpret `$1` as the ticket id. If `$1` is empty, ask the user which ticket to un-escalate.
 2. Run `tk show <ticket>` and verify the ticket exists and contains a note with `Gate: ESCALATE`.
 3. If no ESCALATE note exists, report that the ticket is not escalated and stop.
 4. Run `tk add-note <ticket> "Gate: UNESCALATE — Ticket re-entered the ticket-flow pipeline. Previous escalation overridden. Review attempt counter preserved."`
