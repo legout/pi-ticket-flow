@@ -7,7 +7,7 @@ import {
 
 const models = [
   { provider: "openai-codex", id: "gpt-5.4-mini" },
-  { provider: "kimi-coding", id: "k2p5" },
+  { provider: "kimi-coding", id: "k2.6-coding-preview" },
   { provider: "zai", id: "glm-5.1" },
 ] as Array<Model<any>>;
 
@@ -55,10 +55,10 @@ if (!(await runCase("candidate order follows prompt order", async () => {
 
 if (!(await runCase("excluded models are skipped for fallback selection", async () => {
   const candidate = await selectModelCandidate(
-    ["openai-codex/gpt-5.4-mini", "kimi-coding/k2p5", "zai/glm-5.1"],
+    ["openai-codex/gpt-5.4-mini", "kimi-coding/k2.6-coding-preview", "zai/glm-5.1"],
     undefined,
     registry,
-    { excludedModels: new Set(["openai-codex/gpt-5.4-mini", "kimi-coding/k2p5"]) },
+    { excludedModels: new Set(["openai-codex/gpt-5.4-mini", "kimi-coding/k2.6-coding-preview"]) },
   );
   assert.equal(candidate?.model.provider, "zai");
   assert.equal(candidate?.model.id, "glm-5.1");

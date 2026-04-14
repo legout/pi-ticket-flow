@@ -1,6 +1,6 @@
 ---
 description: Initialize pi-ticket-flow project scaffolding (.ticket-flow/AGENTS.md, .ticket-flow/PLANS.md, and AGENTS.md reference)
-model: kimi-coding/k2p5, anthropic/claude-sonnet-4-20250514
+model: kimi-coding/k2.6-coding-preview, anthropic/claude-sonnet-4-20250514
 thinking: high
 restore: true
 ---

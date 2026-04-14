@@ -1,6 +1,6 @@
 ---
 description: Create or update ARCHITECTURE.md for the project
-model: zai/glm-5.1, kimi-coding/k2p5
+model: zai/glm-5.1, kimi-coding/k2.6-coding-preview
 thinking: high
 skill: architect
 restore: true

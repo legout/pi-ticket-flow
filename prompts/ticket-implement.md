@@ -1,6 +1,6 @@
 ---
 description: Delegate ticket implementation to the base worker agent using the ticket-implement workflow
-model: kimi-coding/k2p5, zai/glm-5-turbo, minimax/MiniMax-M2.7, openai-codex/gpt-5.4-mini
+model: kimi-coding/k2.6-coding-preview, zai/glm-5-turbo, minimax/MiniMax-M2.7, openai-codex/gpt-5.4-mini
 subagent: worker
 inheritContext: false
 skill: ticket-flow-delegated-handoff,ticket-implement
