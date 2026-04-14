@@ -1,6 +1,6 @@
 ---
 description: Run tests in a loop — execute, fix failures, repeat until all tests pass
-model: kimi-coding/k2.6-coding-preview
+model: kimi-coding/k2.6-code-preview
 thinking: medium
 subagent: worker
 inheritContext: true
