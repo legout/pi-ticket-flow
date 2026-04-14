@@ -1,6 +1,6 @@
 ---
 id: ptf-gm5j
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-04-13T19:25:01Z
@@ -109,3 +109,11 @@ Gate: ESCALATE — Implementation blocked before validation could run. The deleg
 **2026-04-13T21:41:17Z**
 
 Gate: UNESCALATE — Bug identified and fixed: isArtifactValid() was comparing against recovery-specific statuses (blocked/revise) instead of accepting all valid statuses (ready-for-validation, ready-for-review, pass, blocked, revise). This caused the recovery code to overwrite good subagent artifacts with blocked ones.
+
+**2026-04-13T21:50:26Z**
+
+Gate: REVISE — Unreadable existing artifacts are silently repaired instead of returning undefined as the contract requires. When readFileSync throws on an existing file, the helper falls through to synthesis instead of propagating the error. Split read/validate so only readable-but-malformed artifacts are repaired; unreadable ones return undefined. Review Attempt: 4/7.
+
+**2026-04-13T22:00:55Z**
+
+Gate: PASS — Bridge recovery for delegated ticket-flow failures complete. All acceptance criteria met. Unreadable artifacts now return undefined per contract. All 5 smoke tests green.

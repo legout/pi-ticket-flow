@@ -1,6 +1,6 @@
 ---
 id: ptf-ykcc
-status: open
+status: closed
 deps: [ptf-gm5j]
 links: []
 created: 2026-04-13T19:25:18Z
@@ -56,3 +56,29 @@ Add a dedicated smoke test suite that validates the recovery helper from the bri
 - Parallel-safe with: M4 (prompt/skill tightening)
 - Suggested worktree isolation: optional
 
+
+## Notes
+
+**2026-04-14T08:10:18Z**
+
+-m Gate: ESCALATE — implementation blocked (429 rate-limit error). Worker aborted before completing. Run token: 20260414T080656Z
+
+**2026-04-14T08:12:50Z**
+
+-m Gate: UNESCALATE — Ticket re-entered the ticket-flow pipeline. Previous escalation overridden. Review attempt counter preserved.
+
+**2026-04-14T08:40:44Z**
+
+Gate: ESCALATE — implementation blocked (429 rate-limit error). Delegated worker aborted before completion. Run token: 20260414T083828Z
+
+**2026-04-14T10:47:27Z**
+
+Gate: UNESCALATE — Ticket re-entered the ticket-flow pipeline. Previous escalation overridden. Review attempt counter preserved.
+
+**2026-04-14T13:10:54Z**
+
+-m Gate: REVISE (attempt 1) — Review found that synthesized validation/review artifacts are under-validated: the smoke suite checks status and step but never verifies the source_artifact field. Run token: 20260414T130254Z
+
+**2026-04-14T13:20:59Z**
+
+-m Gate: PASS — All 7 smoke tests pass including source_artifact verification for validation/review recovery. No regressions in existing suites. Run token: 20260414T131427Z

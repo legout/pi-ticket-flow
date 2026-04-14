@@ -1,6 +1,6 @@
 ---
 id: ptf-yozb
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-04-13T19:25:32Z
@@ -53,3 +53,17 @@ Update the ticket-flow skill and prompt files so that bridge-side recovery is do
 - Parallel-safe with: ptf-gm5j, ptf-ykcc (touches different files)
 - Suggested worktree isolation: optional
 
+
+## Notes
+
+**2026-04-14T07:23:16Z**
+
+-m Gate: ESCALATE — validation blocked (429 service overloaded). Implementation completed but could not be validated or reviewed. Run token: 20260414T071439Z
+
+**2026-04-14T08:12:50Z**
+
+-m Gate: UNESCALATE — Ticket re-entered the ticket-flow pipeline. Previous escalation overridden. Review attempt counter preserved.
+
+**2026-04-14T08:24:00Z**
+
+Gate: PASS — Review passed on all 5 acceptance criteria, all smoke tests green. Run token: 20260414T081541Z
