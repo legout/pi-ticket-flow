@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { artifactPaths } from "./ticket-flow-tools.ts";
+import { isRetryableDelegatedErrorText } from "../vendor/pi-prompt-template-model/delegated-retry.ts";
 
 export interface DelegatedTicketFlowRecoveryInput {
   artifactDir: string;
@@ -35,6 +36,7 @@ function isArtifactValid(
   content: string,
   ticket: string,
   step: string,
+  sourceArtifact: string,
 ): boolean {
   const match = content.match(/^#[^\n]*\n\n([\s\S]*?)(?=\n## )/);
   if (!match) return false;
@@ -43,18 +45,20 @@ function isArtifactValid(
   let foundTicket = false;
   let foundStep = false;
   let foundStatus = false;
+  let foundSourceArtifact = false;
   const validStatuses = VALID_STATUSES[step] ?? [];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === `ticket: ${ticket}`) foundTicket = true;
     if (trimmed === `step: ${step}`) foundStep = true;
+    if (trimmed === `source_artifact: ${sourceArtifact}`) foundSourceArtifact = true;
     for (const s of validStatuses) {
       if (trimmed === `status: ${s}`) foundStatus = true;
     }
   }
 
-  return foundTicket && foundStep && foundStatus;
+  return foundTicket && foundStep && foundStatus && foundSourceArtifact;
 }
 
 function synthesizeArtifact(
@@ -63,22 +67,28 @@ function synthesizeArtifact(
   errorText: string,
   sourceArtifact: string,
 ): string {
+  const transientProviderFailure = isRetryableDelegatedErrorText(errorText);
   const title = step === "implement"
     ? "Implementation Result"
     : step === "validate"
     ? "Validation Result"
     : "Review Result";
   const status = step === "review" ? "revise" : "blocked";
+  const failureClass = transientProviderFailure ? "transient-provider" : "delegated-step-failure";
+  const summaryLine = transientProviderFailure
+    ? `Delegated ${step} step hit a transient provider error and was recovered by the orchestrator bridge.`
+    : `Delegated ${step} step failed and was recovered by the orchestrator bridge.`;
   return `# ${title}
 
 ticket: ${ticket}
 step: ${step}
 status: ${status}
 source_artifact: ${sourceArtifact}
+failure_class: ${failureClass}
 
 ## Summary
 
-Delegated ${step} step failed and was recovered by the orchestrator bridge.
+${summaryLine}
 
 ## Files Changed
 
@@ -128,16 +138,17 @@ export function recoverDelegatedTicketFlowFailure(
     : "none";
 
   if (existsSync(absolutePath)) {
+    let existingContent: string;
     try {
-      const content = readFileSync(absolutePath, "utf8");
-      if (isArtifactValid(content, ticket, step)) {
-        return {
-          summary: `Recovered delegated ${step} step. Existing valid artifact preserved: ${expectedPath}`,
-          artifactPath: expectedPath,
-        };
-      }
+      existingContent = readFileSync(absolutePath, "utf8");
     } catch {
-      // malformed or unreadable, will synthesize below
+      return undefined;
+    }
+    if (isArtifactValid(existingContent, ticket, step, sourceArtifact)) {
+      return {
+        summary: `Recovered delegated ${step} step. Existing valid artifact preserved: ${expectedPath}`,
+        artifactPath: expectedPath,
+      };
     }
   }
 

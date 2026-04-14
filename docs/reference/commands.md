@@ -54,7 +54,3 @@ These exist in `prompts/` and are usually called by chain workflows rather than 
 - `ticket-review`
 - `ticket-finalize`
 - the internal `review-deep-*` passes
-
-Deprecated compatibility shims:
-- `ticket-mark-validation`
-- `ticket-mark-review`

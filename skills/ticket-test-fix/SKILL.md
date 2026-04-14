@@ -121,4 +121,5 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not broaden scope beyond what is needed to validate the selected ticket
 - Validate the current checkout only
 - Do not perform destructive or state-rewriting git operations
+- If this step fails unexpectedly, the orchestrator bridge may synthesize a blocked validation artifact.
 - Do not read or mutate shared `ticket-flow/state.json` in this delegated step

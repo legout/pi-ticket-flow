@@ -121,4 +121,5 @@ Only include real, actionable findings.
 - Do not spawn subagents
 - Be critical but evidence-based
 - If there are no real issues, return `status: pass`
+- If this step fails unexpectedly, the orchestrator bridge may synthesize a `status: revise` review artifact.
 - Do not read or mutate shared `ticket-flow/state.json` in this delegated step

@@ -56,6 +56,8 @@ If `/ticket-queue` stops immediately because it found unfinished or malformed or
 
 Transient delegated-provider overloads (`429`, `temporarily overloaded`, rate-limit style errors) are retried automatically with backoff. If the delegated prompt lists multiple models, retries can fall back to the next configured model.
 
+If all delegated retries are exhausted and bridge recovery writes a blocked implementation or validation artifact for a transient provider failure, finalization should treat that artifact as **retryable infrastructure failure**, not as a genuine ticket blocker to escalate.
+
 Inspect:
 
 - `ticket-flow/state.json`

@@ -10,7 +10,6 @@ The observable behavior after each milestone: running the existing smoke tests (
 
 ## Progress
 
-- [ ] Milestone 1: Delete deprecated prompts (ticket-mark-validation, ticket-mark-review)
 - [ ] Milestone 2: Collapse dual state into single `ticket-flow/state.json`
 - [ ] Milestone 3: Move handoff from in-band string to `ticket-flow/handoff.json` artifact
 - [ ] Milestone 4: Merge ticket-pick ceremony into tool-driven flow
@@ -62,7 +61,7 @@ This is the `pi-ticket-flow` npm package — a pi (coding agent) extension that 
     │   ├── interactive-subagents-tools.ts
     │   ├── prompt-template-interactive-bridge.ts  # 888 lines
     │   └── subagent-runtime/
-    ├── prompts/                         # pi prompt templates (41 files)
+    ├── prompts/                         # pi prompt templates (39 files)
     │   ├── ticket-flow.md              # Chain: pick → implement → test-fix → review → finalize
     │   ├── ticket-queue.md             # Same chain with loop/fresh/converge
     │   ├── ticket-pick.md              # 172-line selection procedure
@@ -72,8 +71,6 @@ This is the `pi-ticket-flow` npm package — a pi (coding agent) extension that 
     │   ├── ticket-finalize.md          # 127-line, 35-step finalization procedure
     │   ├── ticket-reset.md             # Resets orchestrator state
     │   ├── ticket-flow-init.md         # Scaffolds .ticket-flow/ in target repos
-    │   ├── ticket-mark-validation.md   # DEPRECATED — prints "deprecated", CHAIN_STOPs
-    │   ├── ticket-mark-review.md       # DEPRECATED — prints "deprecated", CHAIN_STOPs
     │   ├── ticket-review-deep.md       # 7-line chain def for parallel deep review
     │   ├── ticket-review-deep-handoff.md
     │   ├── ticket-review-deep-correctness.md
@@ -310,11 +307,8 @@ All commands are run from the repository root (`pi-ticket-flow/`).
 ### M1 — Delete deprecated prompts
 
     # Verify nothing references these prompts in a chain
-    grep -r "ticket-mark-validation\|ticket-mark-review" prompts/ skills/ extensions/ README.md
 
     # Delete the files
-    rm prompts/ticket-mark-validation.md
-    rm prompts/ticket-mark-review.md
 
     # Verify
     npm run smoke:bridge-message

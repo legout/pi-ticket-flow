@@ -32,8 +32,6 @@ Current simplified chain:
 - `ticket-review`
 - `ticket-finalize`
 
-`ticket-mark-validation` and `ticket-mark-review` are deprecated compatibility shims.
-
 ## Hard rules
 
 1. **One ticket only.** Never start or review multiple tickets in one invocation.
@@ -162,12 +160,14 @@ Finalization handles four outcomes:
 - BLOCKED
 
 Behavior:
-- implementation blocked -> escalate immediately
-- validation blocked -> escalate immediately
+- implementation blocked -> escalate immediately unless the blocked artifact clearly records a transient provider failure (for example `failure_class: transient-provider`, `429`, `temporarily overloaded`, or rate-limit text); transient provider failures should be left retryable, not escalated
+- validation blocked -> escalate immediately unless the blocked artifact clearly records a transient provider failure (for example `failure_class: transient-provider`, `429`, `temporarily overloaded`, or rate-limit text); transient provider failures should be left retryable, not escalated
 - review `status: pass` -> add PASS note and close ticket
 - review `status: revise` attempt 1-6 -> add REVISE note and leave in progress
 - review `status: revise` attempt 7 -> escalate
 - always finish by writing `state.json` with `stage: "done"`
+
+Note: Bridge-side recovery may synthesize `blocked` or `revise` artifacts after a delegated step failure. `ticket-finalize` treats those artifacts as authoritative evidence, but recovered artifacts that explicitly indicate transient provider failure are retryable infrastructure failures rather than true ticket blockers.
 
 ## Queue notes
 

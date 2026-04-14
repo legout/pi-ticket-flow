@@ -98,4 +98,5 @@ If blocked, replace `Remaining Issues` with clear blockers and the exact failing
 - Do not spawn subagents
 - Keep changes focused on the selected ticket
 - Leave all validation and fix-to-green work to `ticket-test-fix`
+- If a validation command is blocked by policy, the orchestrator bridge may synthesize a blocked implementation artifact on your behalf.
 - Do not read shared `ticket-flow/state.json` in this delegated step
