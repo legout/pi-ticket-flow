@@ -1,6 +1,6 @@
 {
   "name": "pi-ticket-flow",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Standalone pi package for tk ticket workflows with brainstorming, planning, ExecPlan creation, and delegated single-ticket and queue modes.",
   "keywords": [
     "pi-package",
