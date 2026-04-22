@@ -1,6 +1,6 @@
 ---
 description: Internal deep review pass — regressions and compatibility risk
-model: kimi-coding/k2.6-code-preview
+model: kimi-coding/k2.6
 subagent: reviewer
 inheritContext: true
 skill: review

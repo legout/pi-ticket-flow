@@ -1,0 +1,9 @@
+{
+  "version": 3,
+  "ticket": "ptf-ykcc",
+  "ticket_path": ".tickets/ptf-ykcc.md",
+  "run_token": "20260414T083828Z",
+  "mode": "single",
+  "stage": "done",
+  "reason": "ESCALATE — implementation blocked by 429 rate-limit error"
+}

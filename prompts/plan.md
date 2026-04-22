@@ -1,6 +1,6 @@
 ---
 description: Full planning pipeline - brainstorm if needed, then plan-chain
-model: openai-codex/gpt-5.4, zai/glm-5.1, kimi-coding/k2.6-code-preview
+model: openai-codex/gpt-5.4, zai/glm-5.1, kimi-coding/k2.6
 thinking: high
 restore: true
 ---
